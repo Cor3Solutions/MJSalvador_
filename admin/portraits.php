@@ -161,7 +161,7 @@ try {
     <div class="modal fade" id="portraitModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="">
+                <form action="admin_upload_portrait.php" method="POST" enctype="multipart/form-data">
                     <div class="modal-header">
                         <h5 class="modal-title" id="modalTitle">Add New Portrait</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -171,9 +171,10 @@ try {
                         <input type="hidden" name="action" id="action" value="add">
 
                         <div class="mb-3">
-                            <label for="image_filename" class="form-label">Image Path <small class="text-muted">(e.g.,
-                                    images/portraits/photo.jpg)</small></label>
-                            <input type="text" class="form-control" id="image_filename" name="image_filename" required>
+                            <label for="image_file" class="form-label">Upload Image File</label>
+                            <!-- The input field is now type="file" -->
+                            <input type="file" class="form-control" id="image_file" name="image_file" accept="image/*"
+                                required>
                         </div>
 
                         <div class="mb-3">
