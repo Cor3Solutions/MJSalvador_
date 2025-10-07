@@ -1,17 +1,37 @@
 <?php
 require_once 'config.php';
 
+// Helper function for security: HTML-escape data
+if (!function_exists('h')) {
+    function h($string) {
+        return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
+    }
+}
+
 try {
     $conn = getDBConnection();
     
-    // Fetch all videos ordered by display_order
-    $stmt = $conn->prepare("SELECT * FROM videos ORDER BY display_order ASC, video_id DESC");
+    // 1. Fetch Categories dynamically for filter buttons
+    $stmt_cat = $conn->prepare("SELECT name, display_name FROM video_categories ORDER BY sort_order ASC, display_name ASC");
+    $stmt_cat->execute();
+    $categories = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
+    
+    // 2. Fetch all videos, joining to get the category's short 'name' for filtering classes
+    $stmt = $conn->prepare("
+        SELECT 
+            v.*, 
+            vc.name AS category_short_name
+        FROM videos v
+        JOIN video_categories vc ON v.category_id = vc.category_id
+        ORDER BY v.display_order ASC, v.video_id DESC
+    ");
     $stmt->execute();
-    $videos = $stmt->fetchAll();
+    $videos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
 } catch(PDOException $e) {
-    error_log("Error: " . $e->getMessage());
+    error_log("Error in vtr.php: " . $e->getMessage());
     $videos = [];
+    $categories = [];
 }
 ?>
 <!DOCTYPE html>
@@ -54,14 +74,21 @@ try {
             </h4>
         </div>
         
-        <!-- Filter Buttons -->
+        <!-- Filter Buttons (Now Dynamic) -->
         <div class="text-center my-4">
             <div class="btn-group flex-wrap justify-content-center">
+                <!-- 'All' button is hardcoded to show everything -->
                 <button class="filter-button btn btn-outline-dark me-2 active" data-filter="all">All</button>
-                <button class="filter-button btn btn-outline-dark me-2" data-filter="evhi">Event Highlights</button>
-                <button class="filter-button btn btn-outline-dark me-2" data-filter="vtr">VTR with YES Acting</button>
-                <button class="filter-button btn btn-outline-dark me-2" data-filter="aud">Auditions & Screen Tests</button>
-                <button class="filter-button btn btn-outline-dark me-2" data-filter="ads">Advertisements</button>
+                
+                <!-- Dynamic buttons generated from the database -->
+                <?php foreach($categories as $cat): ?>
+                    <button 
+                        class="filter-button btn btn-outline-dark me-2" 
+                        data-filter="<?php echo h($cat['name']); ?>"
+                    >
+                        <?php echo h($cat['display_name']); ?>
+                    </button>
+                <?php endforeach; ?>
             </div>
         </div>
         
@@ -69,7 +96,8 @@ try {
             <div class="swiper vtr-swiper">
                 <div class="swiper-wrapper">
                     <?php foreach($videos as $video): ?>
-                    <div class="swiper-slide item <?php echo h($video['category']); ?>">
+                    <!-- The class is now set using the fetched category_short_name -->
+                    <div class="swiper-slide item <?php echo h($video['category_short_name']); ?>">
                         <div class="ratio ratio-16x9">
                             <iframe src="<?php echo h($video['youtube_embed_url']); ?>" 
                                     title="<?php echo h($video['title']); ?>" 
@@ -94,6 +122,10 @@ try {
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Since we are now using the short 'name' from the database as the filter key,
+        // this JavaScript logic should work automatically as long as the category names 
+        // match the data-filter attributes.
+        
         let mySwiper;
         const allSlides = document.querySelectorAll('.vtr-swiper .swiper-slide');
         

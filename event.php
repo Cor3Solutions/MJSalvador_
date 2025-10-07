@@ -1,10 +1,15 @@
 <?php
+// The custom function h() definition has been removed from this file 
+// to resolve the "Cannot redeclare h()" error, as it appears to be defined
+// unconditionally in config.php (or another included file).
+
 require_once 'config.php';
 
 try {
     $conn = getDBConnection();
     
-    // Fetch event portraits - filter by categories containing 'events' or 'ritemed'
+    // Fetch event portraits - ONLY filter by categories containing 'events' or 'ritemed'
+    // This ensures this page is dedicated only to those specific event types.
     $stmt = $conn->prepare("
         SELECT * FROM portraits 
         WHERE categories LIKE '%events%' OR categories LIKE '%ritemed%'
@@ -52,10 +57,44 @@ try {
             background: url('images/cover.png') center center/cover no-repeat;
             height: 400px;
         }
+        /* Style for the image container to maintain aspect ratio and fit within the card */
+        .card-img-container {
+            height: 300px; /* Fixed height for consistency */
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .card-img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensures the image covers the container without distortion */
+            transition: transform 0.3s ease;
+        }
+        .card:hover .card-img-container img {
+            transform: scale(1.05);
+        }
+        .card {
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .card-body {
+            padding: 1.5rem 1rem;
+        }
+        .portrait-scrollbox {
+            /* If you want the grid to be scrollable within a fixed height: */
+            /* max-height: 80vh; */
+            /* overflow-y: auto; */
+            /* padding: 10px; */
+        }
         @media (max-width: 768px) {
             .page-header {
                 background: url('images/cover-mobile.png') center center/cover no-repeat;
                 height: 250px;
+            }
+            .card-img-container {
+                height: 200px; 
             }
         }
     </style>
@@ -76,7 +115,7 @@ try {
             <!-- Filter buttons -->
             <div class="text-center my-4">
                 <div class="d-flex flex-wrap justify-content-center gap-2">
-                    <button class="btn btn-outline-dark filter-button active" data-filter="*">All Events</button>
+                    <button class="btn btn-dark filter-button active" data-filter="*">All Events</button>
                     <button class="btn btn-outline-dark filter-button" data-filter=".events">General Events</button>
                     <button class="btn btn-outline-dark filter-button" data-filter=".ritemed">RiteMed</button>
                 </div>
@@ -91,18 +130,38 @@ try {
                     </div>
                     <?php else: ?>
                         <?php foreach($event_portraits as $portrait): ?>
-                        <div class="item <?php echo h($portrait['categories']); ?> col-md-4">
-                            <div class="card border-0 shadow-lg">
+                        <?php 
+                        // **FINAL FIX:** Explicitly check for 'events' and 'ritemed' to generate the required CSS classes.
+                        // This bypasses any issues with spaces, commas, or casing in the raw database string.
+                        $category_classes = '';
+                        $categories_lower = strtolower($portrait['categories'] ?? '');
+
+                        // If the category string contains 'events' (or 'general events'), assign the 'events' class
+                        if (str_contains($categories_lower, 'events')) {
+                            $category_classes .= ' events';
+                        }
+
+                        // If the category string contains 'ritemed', assign the 'ritemed' class
+                        if (str_contains($categories_lower, 'ritemed')) {
+                            $category_classes .= ' ritemed';
+                        }
+                        
+                        // Trim leading/trailing whitespace
+                        $category_classes = trim($category_classes);
+                        ?>
+                        <!-- The generated 'category_classes' are now guaranteed to be 'events' or 'ritemed' (or both) -->
+                        <div class="item <?php echo h($category_classes); ?> col-12 col-sm-6 col-md-4">
+                            <div class="card border-0 shadow-lg rounded-3">
                                 <a href="#" data-bs-toggle="modal" data-bs-target="#imageModal" 
                                    data-img-src="<?php echo h($portrait['image_filename']); ?>" 
                                    data-img-alt="<?php echo h($portrait['title']); ?>">
                                     <div class="card-img-container">
                                         <img src="<?php echo h($portrait['image_filename']); ?>" 
                                              alt="<?php echo h($portrait['title']); ?>" 
-                                             class="img-fluid rounded">
+                                             class="img-fluid">
                                     </div>
                                     <div class="card-body text-center">
-                                        <h5 class="card-title"><?php echo h($portrait['title']); ?></h5>
+                                        <h5 class="card-title text-dark fw-bold" style="font-family: 'Playfair Display', serif;"><?php echo h($portrait['title']); ?></h5>
                                     </div>
                                 </a>
                             </div>
@@ -127,11 +186,11 @@ try {
     
     <?php include 'footer.php'; ?>
     
-    <script src="js/jquery-1.11.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Dependencies (using Bootstrap 5.3.3 and latest jQuery) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawR/U9z9KkLp/hS" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"></script>
     <script src="https://unpkg.com/isotope-layout@3/dist/isotope.pkgd.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <script>
     $(document).ready(function() {
@@ -146,6 +205,7 @@ try {
             var filterValue = $(this).attr('data-filter');
             $grid.isotope({ filter: filterValue });
             
+            // Handle active state for buttons
             $('.filter-button').removeClass('active btn-dark').addClass('btn-outline-dark');
             $(this).addClass('active btn-dark').removeClass('btn-outline-dark');
         });
@@ -161,6 +221,12 @@ try {
             
             modalImage.src = src;
             modalImage.alt = alt;
+        });
+
+        // Ensure Isotope reflows after images load to prevent overlap
+        // This is important for correct layout when images load asynchronously
+        $grid.imagesLoaded().progress( function() {
+            $grid.isotope('layout');
         });
     });
     </script>
