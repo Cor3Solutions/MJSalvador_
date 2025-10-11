@@ -1,42 +1,45 @@
 <?php
 require_once 'config.php';
 
-// Define HTML escaping helper function (best practice to define this early)
 if (!function_exists('h')) {
-  function h($text)
-  {
-    return htmlspecialchars((string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-  }
+    function h($text)
+    {
+        return htmlspecialchars((string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
 }
 
-try { // <-- The 'try' keyword was missing here
-  $conn = getDBConnection();
+try {
+    $conn = getDBConnection();
 
-  // Fetch partners
-  $stmt = $conn->prepare("SELECT * FROM partners ORDER BY sort_order ASC");
-  $stmt->execute();
-  $partners = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Fetch partners
+    $stmt = $conn->prepare("SELECT * FROM partners ORDER BY sort_order ASC");
+    $stmt->execute();
+    $partners = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-  // Fetch approved testimonials (Limit 3 for the homepage)
-// ASSUMPTION: 'id' is an auto-incrementing column, indicating insertion order.
-  $stmt = $conn->prepare("SELECT * FROM testimonials WHERE is_approved = 1 ORDER BY testimonial_id DESC LIMIT 3");
-  $stmt->execute();
-  $testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Fetch approved testimonials (limit 3 for homepage)
+    $stmt = $conn->prepare("SELECT * FROM testimonials WHERE is_approved = 1 ORDER BY testimonial_id DESC LIMIT 3");
+    $stmt->execute();
+    $testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-  // Fetch gallery portraits (limit 6 for homepage)
-  $stmt = $conn->prepare("SELECT * FROM portraits ORDER BY sort_order ASC LIMIT 6");
-  $stmt->execute();
-  $portraits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Fetch gallery portraits (limit 6 for homepage)
+    $stmt = $conn->prepare("SELECT * FROM portraits ORDER BY sort_order ASC LIMIT 6");
+    $stmt->execute();
+    $portraits = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-} catch (PDOException $e) { // <-- The 'catch' block was waiting for a 'try'
-  // Log the actual error to a file
-  error_log("Database Error on Homepage: " . $e->getMessage());
-  // Fallback to empty arrays so the page still loads
-  $partners = [];
-  $testimonials = [];
-  $portraits = [];
+    // Fetch professional experiences
+    $stmt = $conn->prepare("SELECT * FROM experiences ORDER BY sort_order ASC, exp_id DESC");
+    $stmt->execute();
+    $experiences = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (PDOException $e) {
+    error_log("Database Error on Homepage: " . $e->getMessage());
+    $partners = [];
+    $testimonials = [];
+    $portraits = [];
+    $experiences = [];
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -574,6 +577,113 @@ try { // <-- The 'try' keyword was missing here
       </div>
     </div>
   </section>
+<!-- ===== Experiences Section (Dynamic, Updated for 2-Column CV Layout) ===== -->
+<section id="experiences" class="py-5 bg-light">
+  <div class="container">
+    <!-- Main Title -->
+    <div class="text-center mb-5">
+      <h2 class="fw-bold fs-1" style="color: #494949;">Experiences</h2>
+      <p class="text-muted fs-5">
+        A glimpse into my professional journey, collaborations, and creative ventures.
+      </p>
+    </div>
+
+    <div class="row">
+      <!-- LEFT COLUMN -->
+      <div class="col-md-6 border-end border-muted pe-md-5 mb-5 mb-md-0">
+        <?php
+        // Define left-side categories
+        $left_categories = [
+          'Professional Experience',
+          'Events & Modeling - Modeled & Ushered For',
+          'Events & Modeling - Runway',
+          'Events & Modeling - Advertised Condominiums'
+        ];
+
+        $left_experiences = array_filter($experiences, function ($exp) use ($left_categories) {
+          return in_array($exp['category'], $left_categories);
+        });
+
+        if (!empty($left_experiences)):
+          $grouped_left = [];
+          foreach ($left_experiences as $exp) {
+            $grouped_left[$exp['category']][] = $exp;
+          }
+
+          foreach ($grouped_left as $category => $items): ?>
+            <h4 class="fw-bold mb-3 pb-2 border-bottom border-secondary" style="color: #494949;">
+              <?php echo h($category); ?>
+            </h4>
+
+            <?php foreach ($items as $item): ?>
+              <div class="mb-4">
+                <p class="fw-semibold mb-1"><?php echo h($item['title']); ?></p>
+                <?php if (!empty($item['subtitle'])): ?>
+                  <p class="small text-muted mb-1"><?php echo h($item['subtitle']); ?></p>
+                <?php endif; ?>
+                <?php if (!empty($item['date_range'])): ?>
+                  <p class="small fst-italic text-secondary mb-1"><?php echo h($item['date_range']); ?></p>
+                <?php endif; ?>
+                <?php if (!empty($item['details'])): ?>
+                  <p class="small text-muted mb-0"><?php echo nl2br(h($item['details'])); ?></p>
+                <?php endif; ?>
+              </div>
+            <?php endforeach;
+          endforeach;
+        else: ?>
+          <p class="small text-muted">No experiences found on this side.</p>
+        <?php endif; ?>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="col-md-6 ps-md-5">
+        <?php
+        // Define right-side categories
+        $right_categories = [
+          'Brand Ambassadress Currently For',
+          'TV & Commercials',
+          'Hosted For'
+        ];
+
+        $right_experiences = array_filter($experiences, function ($exp) use ($right_categories) {
+          return in_array($exp['category'], $right_categories);
+        });
+
+        if (!empty($right_experiences)):
+          $grouped_right = [];
+          foreach ($right_experiences as $exp) {
+            $grouped_right[$exp['category']][] = $exp;
+          }
+
+          foreach ($grouped_right as $category => $items): ?>
+            <h4 class="fw-bold mb-3 pb-2 border-bottom border-secondary" style="color: #494949;">
+              <?php echo h($category); ?>
+            </h4>
+
+            <?php foreach ($items as $item): ?>
+              <div class="mb-4">
+                <p class="fw-semibold mb-1"><?php echo h($item['title']); ?></p>
+                <?php if (!empty($item['subtitle'])): ?>
+                  <p class="small text-muted mb-1"><?php echo h($item['subtitle']); ?></p>
+                <?php endif; ?>
+                <?php if (!empty($item['date_range'])): ?>
+                  <p class="small fst-italic text-secondary mb-1"><?php echo h($item['date_range']); ?></p>
+                <?php endif; ?>
+                <?php if (!empty($item['details'])): ?>
+                  <p class="small text-muted mb-0"><?php echo nl2br(h($item['details'])); ?></p>
+                <?php endif; ?>
+              </div>
+            <?php endforeach;
+          endforeach;
+        else: ?>
+          <p class="small text-muted">No experiences found on this side.</p>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
+</section>
+
+
 
   <section id="testimonials" class="py-5 bg-light">
     <div class="container">

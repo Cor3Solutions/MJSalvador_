@@ -30,6 +30,18 @@ $error = '';
 $flash_message = $_SESSION['flash_message'] ?? null;
 unset($_SESSION['flash_message']);
 
+// NEW: Define the list of controlled categories based on user request
+// These will populate the dropdown and are used for organizing the public-facing CV
+$category_options = [
+    "Professional Experience",
+    "Events & Modeling - Modeled & Ushered For",
+    "Events & Modeling - Runway",
+    "Events & Modeling - Advertised Condominiums",
+    "Brand Ambassadress Currently For",
+    "TV & Commercials",
+    "Hosted For"
+];
+
 try {
     $conn = getDBConnection();
 
@@ -61,15 +73,16 @@ try {
             $errors = [];
             $exp_id = ($action === 'update' && isset($_POST['exp_id'])) ? (int)$_POST['exp_id'] : null;
 
-            $title      = trim($_POST['title'] ?? '');
-            $subtitle   = trim($_POST['subtitle'] ?? '');
-            $category   = trim($_POST['category'] ?? '');
-            $date_range = trim($_POST['date_range'] ?? '');
-            $details    = trim($_POST['details'] ?? ''); // Details can contain line breaks, don't strip
+            $title       = trim($_POST['title'] ?? '');
+            $subtitle    = trim($_POST['subtitle'] ?? '');
+            $category    = trim($_POST['category'] ?? '');
+            $date_range  = trim($_POST['date_range'] ?? '');
+            $details     = trim($_POST['details'] ?? ''); // Details can contain line breaks, don't strip
             $sort_order = filter_var($_POST['sort_order'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
 
-            if (empty($title))      $errors[] = "Title is required.";
-            if (empty($category))   $errors[] = "Category is required.";
+            if (empty($title))       $errors[] = "Title is required.";
+            // Validate category: must be selected from the defined list
+            if (!in_array($category, $category_options)) $errors[] = "Category is required and must be selected from the predefined list.";
             if ($sort_order === false || $sort_order === null) $errors[] = "Sort Order must be a non-negative integer.";
 
             if (empty($errors)) {
@@ -270,8 +283,13 @@ unset($_SESSION['post_data']);
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="category" class="form-label">Category <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="category" name="category" required maxlength="50"
-                                    placeholder="e.g., Education, Work, Skill">
+                                <!-- UPDATED: Replaced text input with select dropdown for controlled categories -->
+                                <select class="form-select" id="category" name="category" required>
+                                    <option value="" disabled selected>Select a Category</option>
+                                    <?php foreach ($category_options as $option): ?>
+                                        <option value="<?php echo h($option); ?>"><?php echo h($option); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="date_range" class="form-label">Date Range</label>
@@ -328,6 +346,8 @@ unset($_SESSION['post_data']);
                 modalSaveButton.textContent = 'Create Item';
                 modalSaveButton.classList.remove('btn-warning');
                 modalSaveButton.classList.add('btn-primary');
+                // Ensure the select defaults to the placeholder
+                document.getElementById('category').value = "";
             }
 
             // Function to populate and switch to "Edit" mode
@@ -340,6 +360,7 @@ unset($_SESSION['post_data']);
                 // Populate form fields
                 document.getElementById('title').value = data.title;
                 document.getElementById('subtitle').value = data.subtitle;
+                // This line now sets the value of the <select>
                 document.getElementById('category').value = data.category;
                 document.getElementById('date_range').value = data.daterange;
                 document.getElementById('sort_order').value = data.sortorder;
