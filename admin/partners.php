@@ -3,6 +3,14 @@ require_once '../config.php';
 // Define current page for sidebar activation
 $currentPage = 'partners.php';
 
+// Helper function for security: HTML-escape data (Added for robustness)
+if (!function_exists('h')) {
+    function h($string) {
+        return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
+    }
+}
+
+
 // Authentication Check
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
@@ -139,7 +147,7 @@ if (isset($_GET['status'])) {
 }
 
 // ===============================================
-// PHP FUNCTION TO RENDER THE FORM (For AJAX call) - Unchanged
+// PHP FUNCTION TO RENDER THE FORM (For AJAX call) - UPDATED FOR STYLE
 // ===============================================
 function render_partner_form($conn, $partner_id = 0) {
     $partner = null;
@@ -164,35 +172,35 @@ function render_partner_form($conn, $partner_id = 0) {
         <input type="hidden" name="current_logo" value="<?php echo h($partner['logo_image_file'] ?? ''); ?>">
 
         <div class="mb-3">
-            <label for="name" class="form-label">Partner/Brand Name</label>
+            <label for="name" class="form-label fw-bold">Partner/Brand Name</label>
             <input type="text" class="form-control" id="name" name="name" 
-                   value="<?php echo h($partner['name'] ?? ''); ?>" required>
+                    value="<?php echo h($partner['name'] ?? ''); ?>" required placeholder="e.g., Acme Corp.">
         </div>
 
         <div class="mb-3">
-            <label for="sort_order" class="form-label">Display Order</label>
+            <label for="sort_order" class="form-label fw-bold">Display Order</label>
             <input type="number" class="form-control" id="sort_order" name="sort_order" 
-                   value="<?php echo h($partner['sort_order'] ?? 0); ?>">
+                    value="<?php echo h($partner['sort_order'] ?? 0); ?>">
             <small class="text-muted">Lower numbers appear first.</small>
         </div>
 
         <div class="mb-3">
-            <label for="logo_image_file" class="form-label">Logo Image (JPG/PNG)</label>
+            <label for="logo_image_file" class="form-label fw-bold">Logo Image (JPG/PNG)</label>
             <input class="form-control" type="file" id="logo_image_file" name="logo_image_file" 
-                   accept="image/png, image/jpeg">
+                    accept="image/png, image/jpeg">
             <?php if ($partner && $partner['logo_image_file']): ?>
-                <div class="mt-2">
-                    <p class="mb-1">Current Logo:</p>
+                <div class="mt-2 p-2 border rounded bg-light">
+                    <p class="mb-1 fw-semibold">Current Logo:</p>
                     <img src="../images/partners/<?php echo h($partner['logo_image_file']); ?>" 
-                         alt="Current Logo" style="max-width: 150px; height: auto; border: 1px solid #ddd;">
-                    <small class="d-block text-muted">Upload a new image to replace the current one.</small>
+                          alt="Current Logo" class="img-thumbnail" style="max-width: 150px; height: auto; object-fit: contain;">
+                    <small class="d-block text-muted mt-1">Upload a new image to replace the current one.</small>
                 </div>
             <?php endif; ?>
         </div>
 
         <div class="modal-footer px-0 pb-0">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            <button type="submit" class="btn btn-primary">Save Partner</button>
+            <button type="submit" class="btn btn-dark shadow-sm">Save Partner</button>
         </div>
     </form>
     <?php
@@ -207,95 +215,186 @@ if (isset($_GET['ajax_action']) && $_GET['ajax_action'] === 'load_form') {
     exit;
 }
 ?>
+<!DOCTYPE html>
+<html lang="en">
 
-<?php include 'admin_header.php'; ?>
-<div class="container-fluid">
-    <div class="row">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Partners</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa; /* Lighter, cleaner background */
+        }
+        .main-content {
+             /* Adjust padding for better look */
+            padding: 0 1rem; 
+        }
+        .content-header {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1.5rem 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.04);
+        }
+        .card {
+            border: none;
+            border-radius: 12px; 
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08); /* Deeper shadow */
+        }
+        .table thead th {
+            background-color: #f0f2f5; 
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 700;
+            color: #495057;
+        }
+        .modal-content {
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        .table-hover tbody tr:hover {
+            background-color: #e9f0ff; /* Subtle blue highlight on hover */
+            cursor: default;
+        }
+        /* Style for the logo image cell */
+        .logo-container img {
+            max-width: 70px; /* Slightly larger image display */
+            height: auto;
+            object-fit: contain;
+            padding: 4px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+        }
+    </style>
+</head>
 
-        <?php include 'admin_sidebar.php'; ?>
+<body>
+    <?php include 'admin_header.php'; ?>
 
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4"> 
+    <div class="container-fluid">
+        <div class="row">
 
-            <div class="pt-3 pb-2 mb-4 border-bottom d-flex justify-content-between align-items-center">
-                <h1 class="h2">Manage Partners</h1>
-                
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#partnerModal" 
-                        data-id="0">
-                    <i class="bi bi-plus-lg"></i> Add New Partner
-                </button>
-            </div>
+            <?php include 'admin_sidebar.php'; ?>
 
-            <?php if ($error): ?>
-                <div class="alert alert-danger"><?php echo h($error); ?></div>
-            <?php endif; ?>
-            <?php if ($success_message): ?>
-                <div class="alert alert-success"><?php echo $success_message; ?></div>
-            <?php endif; ?>
+            <main class="col-md-9 ms-sm-auto col-lg-10 main-content"> 
 
-            <div class="card mb-4">
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Order</th>
-                                    <th>Logo</th>
-                                    <th>Name</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($partners)): ?>
+                <!-- Enhanced Content Header -->
+                <div class="content-header d-flex justify-content-between align-items-center">
+                    <h1 class="h2 fw-bolder text-dark m-0">Partner Management</h1>
+                    
+                    <button class="btn btn-success btn-lg shadow-sm" data-bs-toggle="modal" 
+                            data-bs-target="#partnerModal" data-id="0">
+                        <i class="bi bi-plus-lg me-2"></i> Add New Partner
+                    </button>
+                </div>
+
+                <!-- Alerts Section -->
+                <div class="row px-3">
+                    <?php if ($error): ?>
+                        <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm" role="alert"><?php echo h($error); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($success_message): ?>
+                        <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm" role="alert"><?php echo h($success_message); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Partner List Card -->
+                <div class="card mb-5 shadow-lg">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <!-- Use table-borderless and table-hover for modern look -->
+                            <table class="table table-borderless table-hover align-middle mb-0">
+                                <thead>
                                     <tr>
-                                        <td colspan="4" class="text-center text-muted">No partners found.</td>
+                                        <th class="py-3 ps-4">Order</th>
+                                        <th class="py-3">Logo</th>
+                                        <th class="py-3">Name</th>
+                                        <th class="py-3 text-end pe-4">Actions</th>
                                     </tr>
-                                <?php else: ?>
-                                    <?php foreach ($partners as $p): ?>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($partners)): ?>
                                         <tr>
-                                            <td><?php echo $p['sort_order']; ?></td>
-                                            <td>
-                                                <?php if ($p['logo_image_file']): ?>
-                                                    <img src="../images/partners/<?php echo h($p['logo_image_file']); ?>"
-                                                        alt="<?php echo h($p['name']); ?>"
-                                                        style="width: 60px; height: auto; object-fit: contain;">
-                                                <?php else: ?>
-                                                    N/A
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo h($p['name']); ?></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-warning me-1 edit-btn" data-bs-toggle="modal" 
-                                                        data-bs-target="#partnerModal" data-id="<?php echo $p['partner_id']; ?>">
-                                                    Edit
-                                                </button>
-                                                <a href="?action=delete&id=<?php echo $p['partner_id']; ?>"
-                                                    onclick="return confirm('Are you sure you want to delete this partner?');"
-                                                    class="btn btn-sm btn-danger">Delete</a>
+                                            <td colspan="4" class="text-center text-muted py-5">
+                                                <i class="bi bi-link-45deg me-2"></i> No partners found.
                                             </td>
                                         </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                                    <?php else: ?>
+                                        <?php foreach ($partners as $p): ?>
+                                            <tr>
+                                                <td class="ps-4">
+                                                    <span class="badge bg-secondary"><?php echo h($p['sort_order']); ?></span>
+                                                </td>
+                                                <td class="logo-container">
+                                                    <?php if ($p['logo_image_file']): ?>
+                                                        <!-- Added image fallback with onerror -->
+                                                        <img src="../images/partners/<?php echo h($p['logo_image_file']); ?>"
+                                                             alt="<?php echo h($p['name']); ?>"
+                                                             onerror="this.onerror=null;this.src='https://placehold.co/70x40/adb5bd/ffffff?text=LOGO';"
+                                                             title="Current Logo">
+                                                    <?php else: ?>
+                                                        <span class="text-muted small">N/A</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="fw-semibold"><?php echo h($p['name']); ?></td>
+                                                <td class="text-end pe-4">
+                                                    <!-- Updated buttons with icons and standard colors -->
+                                                    <button class="btn btn-sm btn-warning me-2 edit-btn text-white" 
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#partnerModal" 
+                                                            data-id="<?php echo $p['partner_id']; ?>">
+                                                        <i class="bi bi-pencil"></i> Edit
+                                                    </button>
+                                                    <a href="?action=delete&id=<?php echo $p['partner_id']; ?>"
+                                                        onclick="return confirm('Are you sure you want to delete the partner: <?php echo h(addslashes($p['name'])); ?>? This cannot be undone.');"
+                                                        class="btn btn-sm btn-danger">
+                                                        <i class="bi bi-trash"></i> Delete
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="modal fade" id="partnerModal" tabindex="-1" aria-labelledby="partnerModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="partnerModalLabel">Add/Edit Partner</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <div class="modal-body" id="partnerModalBody">
-                            <div class="text-center py-5">Loading form...</div>
+                <!-- Partner Modal (Add/Edit Form) -->
+                <div class="modal fade" id="partnerModal" tabindex="-1" aria-labelledby="partnerModalLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <!-- Styled Modal Header -->
+                            <div class="modal-header bg-dark text-white rounded-top-2">
+                                <h5 class="modal-title" id="partnerModalLabel">Add/Edit Partner</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <!-- Modal Body is where AJAX content loads -->
+                            <div class="modal-body" id="partnerModalBody">
+                                <div class="text-center py-5 text-muted">
+                                    <i class="bi bi-hourglass-split me-2"></i> Loading form...
+                                </div>
+                            </div>
+                            <!-- Modal Footer is handled within the PHP render_partner_form function now -->
                         </div>
                     </div>
                 </div>
-            </div>
 
-        </main> </div> </div> <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+            </main> 
+        </div> 
+    </div> 
+    
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 $(document).ready(function() {
     var partnerModal = $('#partnerModal');
@@ -303,9 +402,12 @@ $(document).ready(function() {
     var modalTitle = $('#partnerModalLabel');
     var pageUrl = 'partners.php'; // The current file
 
-    // Function to load the form content into the modal via AJAX
+    /**
+     * Function to load the partner form content into the modal via AJAX.
+     * @param {number} partnerId - The ID of the partner to edit (0 for new).
+     */
     function loadFormContent(partnerId) {
-        modalBody.html('<div class="text-center py-5"><i class="bi bi-hourglass-split"></i> Loading form...</div>');
+        modalBody.html('<div class="text-center py-5 text-muted"><i class="bi bi-hourglass-split me-2"></i> Loading form...</div>');
         
         // AJAX call to get ONLY the form HTML from the PHP file
         $.ajax({
@@ -322,7 +424,7 @@ $(document).ready(function() {
                 }
             },
             error: function() {
-                modalBody.html('<div class="alert alert-danger">Error loading form content.</div>');
+                modalBody.html('<div class="alert alert-danger rounded-3 shadow-sm">Error loading form content. Please check the server logs.</div>');
             }
         });
     }
@@ -334,43 +436,40 @@ $(document).ready(function() {
         loadFormContent(partnerId);
     });
 
-    // Handle AJAX Form Submission (Delegated event handling)
+    // Handle AJAX Form Submission (Delegated event handling for form inside modal)
     modalBody.on('submit', '#partnerForm', function(e) {
         e.preventDefault();
         var formData = new FormData(this); // Captures file uploads
 
         // Display a loading message
-        $('#form-message').html('<div class="alert alert-info">Saving... please wait.</div>');
+        $('#form-message').html('<div class="alert alert-info rounded-3 shadow-sm">Saving... please wait.</div>');
 
-        // Note: The success case relies on the PHP redirect causing a full page reload.
-        // The error handler below will catch non-redirect responses (including the duplicate error text).
         $.ajax({
             url: pageUrl,
             type: 'POST',
             data: formData,
             processData: false, 
             contentType: false, 
+            dataType: 'html', 
             success: function(response) {
-                 // If the response contains the duplicate error, display it in the form.
+                 // The PHP handler is set up to redirect on success. 
+                 // If the AJAX call returns HTML, it usually means the redirect failed or an error occurred before redirect.
                  if (response.includes("A partner with the name")) {
-                     $('#form-message').html('<div class="alert alert-danger">' + response + '</div>');
+                     $('#form-message').html('<div class="alert alert-danger rounded-3 shadow-sm">A partner with that name already exists. Please choose a unique name.</div>');
+                 } else {
+                    // If no specific error is detected, assume success and force a page reload 
+                    // to reflect changes and show the success message from the URL parameter.
+                    window.location.reload();
                  }
-                 // Otherwise, expect a redirect/reload from the server.
             },
             error: function(xhr) {
-                // If a server-side PHP error occurs, display it.
-                $('#form-message').html('<div class="alert alert-danger">Error: ' + (xhr.responseText.substring(0, 200) || 'An unknown error occurred.') + '</div>');
+                // Display server error if the call fails unexpectedly
+                const errorText = xhr.responseText.substring(0, 200) || 'An unknown error occurred.';
+                $('#form-message').html('<div class="alert alert-danger rounded-3 shadow-sm">Server Error: ' + errorText + '</div>');
             }
         });
     });
 });
 </script>
-
-<?php 
-/*
- * We remove the unnecessary closing tags at the end of the file, as they are now correctly placed.
- */
-?>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

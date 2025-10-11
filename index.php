@@ -228,6 +228,72 @@ try { // <-- The 'try' keyword was missing here
         padding: 20px 15px 40px;
       }
     }
+
+    /* === FIXED MODAL COLORS === */
+    .modal-content {
+      background-color: #fff !important;
+      color: #333 !important;
+      border-radius: 16px;
+      border: none;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-header {
+      background-color: #ffe4ec;
+      border-bottom: 3px solid #cd919e;
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+    }
+
+    .modal-title {
+      font-weight: 700;
+      color: #333;
+    }
+
+    .modal-body {
+      background-color: #fff !important;
+    }
+
+    .modal-footer {
+      background-color: #fff !important;
+      border-top: 1px solid #eee;
+    }
+
+    .form-label {
+      color: #333 !important;
+      font-weight: 600;
+    }
+
+    .form-control,
+    .form-select {
+      background-color: #fff;
+      color: #333;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    .btn-submit-inquiry {
+      background-color: #cd919e;
+      color: white;
+      border: none;
+      font-weight: 600;
+      border-radius: 30px;
+      transition: 0.2s;
+    }
+
+    .btn-submit-inquiry:hover {
+      background-color: #b87c88;
+    }
+
+    .btn-close {
+      filter: invert(0);
+    }
+
+    /* Optional: fade overlay to be slightly transparent black */
+    .modal-backdrop.show {
+      opacity: 0.6 !important;
+      background-color: rgba(0, 0, 0, 0.6);
+    }
   </style>
   <section class="banner-section position-relative text-center py-5" style="background-color: #ffe4ec;">
     <div class="main-banner swiper">
@@ -386,59 +452,59 @@ try { // <-- The 'try' keyword was missing here
     </div>
   </section>
   <br><br>
-  <div class="modal fade" id="inquiryModal" tabindex="-1" aria-labelledby="inquiryModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header" style="background-color: #ffe4ec;">
-          <h5 class="modal-title" id="inquiryModalLabel">Send Us Your Inquiry</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <form id="inquiryForm">
-          <div class="modal-body">
-            <p>Tell us about your project or collaboration idea!</p>
+ <div class="modal fade" id="inquiryModal" tabindex="-1" aria-labelledby="inquiryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-md modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="inquiryModalLabel">Send Us Your Inquiry</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="inquiryForm">
+        <div class="modal-body p-4">
+          <p class="text-muted mb-4">Tell us about your project or collaboration idea! We'll get back to you within 24–48 hours.</p>
 
-            <div class="mb-3">
-              <label for="inquiryName" class="form-label">Your Full Name</label>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="inquiryName" class="form-label">Your Full Name <span class="text-danger">*</span></label>
               <input type="text" class="form-control" id="inquiryName" name="full_name" required>
             </div>
-
-            <div class="mb-3">
-              <label for="inquiryEmail" class="form-label">Email Address</label>
+            <div class="col-md-6 mb-3">
+              <label for="inquiryEmail" class="form-label">Email Address <span class="text-danger">*</span></label>
               <input type="email" class="form-control" id="inquiryEmail" name="email" required>
             </div>
-
-            <div class="mb-3">
-              <label for="inquiryPhone" class="form-label">Phone Number (Optional)</label>
-              <input type="tel" class="form-control" id="inquiryPhone" name="phone_number">
-            </div>
-
-            <div class="mb-3">
-              <label for="inquiryType" class="form-label">Type of Inquiry</label>
-              <select class="form-select" id="inquiryType" name="inquiry_type" required>
-                <option value="" selected disabled>Select...</option>
-                <option value="Collaboration">Collaboration / Project</option>
-                <option value="Booking">Booking / Rate Inquiry</option>
-                <option value="General Question">General Question</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div class="mb-3">
-              <label for="inquiryMessage" class="form-label">Message / Details</label>
-              <textarea class="form-control" id="inquiryMessage" name="message" rows="4" required></textarea>
-            </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            <button type="submit" class="btn btn-primary" id="submitBtn"
-              style="background-color: #cd919e; border: none;">
-              Send Inquiry
-            </button>
+
+          <div class="mb-3">
+            <label for="inquiryPhone" class="form-label">Phone Number (Optional)</label>
+            <input type="tel" class="form-control" id="inquiryPhone" name="phone_number">
           </div>
-        </form>
-      </div>
+
+          <div class="mb-3">
+            <label for="inquiryType" class="form-label">Type of Inquiry <span class="text-danger">*</span></label>
+            <select class="form-select" id="inquiryType" name="inquiry_type" required>
+              <option value="" selected disabled>Select...</option>
+              <option value="Executive Virtual Assistant">Executive Virtual Assistant</option>
+              <option value="Modeling/Acting Booking">Modeling / Acting Booking</option>
+              <option value="Collaboration">Collaboration / Project Idea</option>
+              <option value="General Question">General Question</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="inquiryMessage" class="form-label">Message / Project Details <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="inquiryMessage" name="message" rows="4" required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-submit-inquiry px-5" id="submitBtn">Send Inquiry</button>
+        </div>
+      </form>
     </div>
   </div>
+</div>
+
   <section class="container-xxl py-5 bg-white">
     <div class="container text-center">
       <h4 class="section-title">Partners</h4>
@@ -731,6 +797,27 @@ try { // <-- The 'try' keyword was missing here
           });
       });
     }
+
+    var mainBannerSwiper = new Swiper(".main-banner", {
+      loop: true,
+      autoplay: {
+        delay: 1000, //  (1 second)
+        disableOnInteraction: false,
+      },
+      speed: 2000,
+      slidesPerView: 1, // Base setting, overridden by breakpoints
+      spaceBetween: 10,
+      breakpoints: {
+        // Mobile (0px and up)
+        0: { slidesPerView: 3, spaceBetween: 20, centeredSlides: true },
+        // Larger Tablet/Small Desktop (980px and up)
+        980: { slidesPerView: 4, spaceBetween: 20, centeredSlides: true },
+        // Large Desktop (1200px and up)
+        1200: { slidesPerView: 5, spaceBetween: 20, centeredSlides: true }
+      },
+      pagination: false // disables pagination safely
+    });
+
     // Initialization for the testimonialSwiper
     var testimonialSwiper = new Swiper(".testimonialSwiper", {
       // Basic settings

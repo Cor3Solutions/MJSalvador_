@@ -88,7 +88,7 @@ try {
     
     // Check for success status from redirect
     if (isset($_GET['status']) && $_GET['status'] == 'deleted') {
-         $success = 'Video deleted successfully!';
+           $success = 'Video deleted successfully!';
     }
 
 
@@ -119,9 +119,48 @@ try {
     <title>Manage Videos</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa; /* Lighter, cleaner background */
+        }
         .main-content {
-            padding-left: 20px;
+            padding: 0 1rem; /* Adjust padding for better look */
+        }
+        .content-header {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1.5rem 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.04);
+        }
+        .card {
+            border: none;
+            border-radius: 12px; 
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08); /* Deeper shadow */
+        }
+        .table thead th {
+            background-color: #f0f2f5; 
+            border-bottom: 2px solid #dee2e6;
+            font-weight: 700;
+            color: #495057;
+        }
+        .modal-content {
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        .table-hover tbody tr:hover {
+            background-color: #e9f0ff; /* Subtle blue highlight on hover */
+            cursor: default;
+        }
+        /* Custom badge colors for categories */
+        .badge-video {
+            background-color: #007bff;
+            color: white;
+            padding: 0.5em 0.75em;
+            border-radius: 6px;
         }
     </style>
 </head>
@@ -134,60 +173,70 @@ try {
             <?php include 'admin_sidebar.php'; ?>
 
             <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
-                <div class="pt-3 pb-2 mb-4 border-bottom d-flex justify-content-between align-items-center">
-                    <h1 class="h2">Manage Videos</h1>
-                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#videoModal"
+                
+                <!-- Enhanced Content Header -->
+                <div class="content-header d-flex justify-content-between align-items-center">
+                    <h1 class="h2 fw-bolder text-dark m-0">Video Management</h1>
+                    <button class="btn btn-success btn-lg shadow-sm" data-bs-toggle="modal" data-bs-target="#videoModal"
                         onclick="resetForm()">
-                        <i class="bi bi-plus-lg"></i> Add New Video
+                        <i class="bi bi-play-circle-fill me-2"></i> Add New Video
                     </button>
                 </div>
 
-                <?php if ($error): ?>
-                    <div class="alert alert-danger alert-dismissible fade show"><?php echo h($error); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
-                <?php if ($success): ?>
-                    <div class="alert alert-success alert-dismissible fade show"><?php echo h($success); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                <?php endif; ?>
+                <!-- Alerts Section -->
+                <div class="row px-3">
+                    <?php if ($error): ?>
+                        <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm" role="alert"><?php echo h($error); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    <?php endif; ?>
+                    <?php if ($success): ?>
+                        <div class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm" role="alert"><?php echo h($success); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    <?php endif; ?>
+                </div>
 
-                <div class="card mb-4">
+                <!-- Video List Card -->
+                <div class="card mb-5 shadow-lg">
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-striped table-hover">
+                            <table class="table table-borderless table-hover align-middle mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Order</th>
-                                        <th>Title</th>
-                                        <th>Category</th>
-                                        <th>YouTube URL (Snippet)</th>
-                                        <th>Actions</th>
+                                        <th class="py-3 ps-4">Order</th>
+                                        <th class="py-3">Title</th>
+                                        <th class="py-3">Category</th>
+                                        <th class="py-3">YouTube URL (Snippet)</th>
+                                        <th class="py-3 text-end pe-4">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($videos)): ?>
                                         <tr>
-                                            <td colspan="5" class="text-center text-muted">No videos found.</td>
+                                            <td colspan="5" class="text-center text-muted py-5">
+                                                <i class="bi bi-film me-2"></i> No videos found. Start adding content!
+                                            </td>
                                         </tr>
                                     <?php else: ?>
                                         <?php foreach ($videos as $v): ?>
                                             <tr>
-                                                <td><?php echo h($v['display_order']); ?></td>
-                                                <td><?php echo h($v['title']); ?></td>
-                                                <!-- Display the human-readable category name from the JOIN -->
-                                                <td><?php echo h($v['category_display_name']); ?></td>
-                                                <td><?php echo h(substr($v['youtube_embed_url'], 0, 40)) . '...'; ?></td>
-                                                <td>
+                                                <td class="ps-4"><span class="badge bg-secondary"><?php echo h($v['display_order']); ?></span></td>
+                                                <td class="fw-semibold text-break"><?php echo h($v['title']); ?></td>
+                                                <td><span class="badge badge-video"><?php echo h($v['category_display_name']); ?></span></td>
+                                                <td><small class="text-muted"><?php echo h(substr($v['youtube_embed_url'], 0, 35)) . '...'; ?></small></td>
+                                                <td class="text-end pe-4">
                                                     <!-- Pass the full video object including category_id_fk to the JS function -->
-                                                    <button class="btn btn-sm btn-warning me-1"
-                                                        onclick='editVideo(<?php echo json_encode($v); ?>)'>
-                                                        Edit
+                                                    <button class="btn btn-sm btn-warning me-2 text-white"
+                                                        onclick='editVideo(<?php echo json_encode($v); ?>)'
+                                                        data-bs-toggle="modal" data-bs-target="#videoModal">
+                                                        <i class="bi bi-pencil"></i> Edit
                                                     </button>
                                                     <a href="?action=delete&id=<?php echo h($v['video_id']); ?>"
-                                                        onclick="return confirm('Are you sure you want to delete this video?');"
-                                                        class="btn btn-sm btn-danger">Delete</a>
+                                                        onclick="return confirm('Are you sure you want to permanently delete the video: <?php echo h(addslashes($v['title'])); ?>?');"
+                                                        class="btn btn-sm btn-danger">
+                                                        <i class="bi bi-trash"></i> Delete
+                                                    </a>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -207,11 +256,10 @@ try {
     <div class="modal fade" id="videoModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <!-- IMPORTANT: Changed form name from category to category_id -->
                 <form action="videos.php" method="POST">
-                    <div class="modal-header">
+                    <div class="modal-header bg-dark text-white rounded-top-2">
                         <h5 class="modal-title" id="modalTitle">Add New Video</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <!-- Hidden fields for action and ID -->
@@ -219,13 +267,13 @@ try {
                         <input type="hidden" name="video_id" id="video_id">
 
                         <div class="mb-3">
-                            <label for="title" class="form-label">Title</label>
-                            <input type="text" class="form-control" id="title" name="title" required>
+                            <label for="title" class="form-label fw-bold">Video Title</label>
+                            <input type="text" class="form-control" id="title" name="title" required placeholder="Enter video title">
                         </div>
 
                         <div class="mb-3">
-                            <label for="category_id" class="form-label">Category</label>
-                            <!-- Category is now a SELECT dropdown using category_id -->
+                            <label for="category_id" class="form-label fw-bold">Category</label>
+                            <!-- Category is a SELECT dropdown using category_id -->
                             <select class="form-select" id="category_id" name="category_id" required>
                                 <option value="" disabled selected>Select a category</option>
                                 <?php foreach ($videoCategories as $cat): ?>
@@ -237,60 +285,63 @@ try {
                         </div>
 
                         <div class="mb-3">
-                            <label for="youtube_url" class="form-label">YouTube URL (Embed or Watch Link)</label>
-                            <input type="url" class="form-control" id="youtube_url" name="youtube_url" required>
-                            <small class="text-muted">Enter the full link (e.g., https://youtu.be/ID or https://www.youtube.com/watch?v=ID)</small>
+                            <label for="youtube_url" class="form-label fw-bold">YouTube URL</label>
+                            <input type="url" class="form-control" id="youtube_url" name="youtube_url" required placeholder="Paste YouTube watch or share URL here">
+                            <small class="form-text text-muted">Must be a complete link (e.g., https://youtu.be/ID)</small>
                         </div>
 
                         <div class="mb-3">
-                            <label for="display_order" class="form-label">Display Order</label>
-                            <input type="number" class="form-control" id="display_order" name="display_order" value="0">
+                            <label for="display_order" class="form-label fw-bold">Display Order</label>
+                            <input type="number" class="form-control" id="display_order" name="display_order" value="0" min="0">
+                            <small class="form-text text-muted">Videos are sorted ascending by this number.</small>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Save Video</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-success shadow-sm">Save Video</button>
                     </div>
                 </form>
             </div>
+            
         </div>
     </div>
 
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Function to reset the form for adding a new video
+        /**
+         * Resets the modal form to its "Add New Video" state.
+         */
         function resetForm() {
             document.getElementById('modalTitle').textContent = 'Add New Video';
             document.getElementById('action').value = 'add';
             document.getElementById('video_id').value = '';
             document.getElementById('title').value = '';
             
-            // Set select to default (empty value)
+            // Reset select to default/placeholder
             document.getElementById('category_id').value = ''; 
 
             document.getElementById('youtube_url').value = '';
             document.getElementById('display_order').value = '0';
         }
 
-        // Function to populate the form for editing an existing video
+        /**
+         * Populates the modal form with data for editing an existing video.
+         * @param {object} video - The video object retrieved from the database.
+         */
         function editVideo(video) {
-            document.getElementById('modalTitle').textContent = 'Edit Video';
+            document.getElementById('modalTitle').textContent = 'Edit Video: ' + video.title;
             document.getElementById('action').value = 'edit';
             
             // Populate hidden ID and visible fields
             document.getElementById('video_id').value = video.video_id;
             document.getElementById('title').value = video.title;
             
-            // Use the fetched category_id_fk (which is the actual category_id foreign key)
+            // Set the dropdown value using the foreign key
             document.getElementById('category_id').value = video.category_id_fk; 
             
             document.getElementById('youtube_url').value = video.youtube_embed_url; 
             document.getElementById('display_order').value = video.display_order;
-
-            // Show the modal
-            var modal = new bootstrap.Modal(document.getElementById('videoModal'));
-            modal.show();
         }
     </script>
 </body>
