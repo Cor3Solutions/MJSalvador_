@@ -685,87 +685,302 @@ try {
 
 
 
-  <section id="testimonials" class="py-5 bg-light">
-    <div class="container">
-      <div class="text-center mb-5">
-        <h4 class="section-title text-uppercase">Testimonials</h4>
-        <h2 class="display-5 fw-semibold">Feedbacks</h2>
-        <p class="text-muted">Real words from people I've worked with</p>
-      </div>
+  <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-pink': '#cd919e',
+                        'soft-pink': '#fef7f9',
+                        'dark-text': '#1f2937',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for Swiper pagination and card aesthetics */
+        body { font-family: 'Inter', sans-serif; background-color: #f7f7f7; }
+        .form-control { border-radius: 0.5rem; padding: 0.75rem 1rem; border: 1px solid #e5e7eb; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out; }
+        .form-control:focus { border-color: #cd919e; box-shadow: 0 0 0 3px rgba(205, 145, 158, 0.25); outline: none; }
+        .swiper-pagination-bullet { width: 10px; height: 10px; opacity: 1; background: #d1d5db; transition: background-color 0.3s; }
+        .swiper-pagination-bullet-active { background: #cd919e; width: 12px; height: 12px; }
+        .testimonial-card { border-radius: 1rem; background-color: white; transition: transform 0.3s ease-in-out; border: 1px solid #f3f4f6; }
+        .testimonial-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .quote-icon svg { color: #d1d5db; opacity: 0.7; }
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.5); display: none; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.3s ease; opacity: 0; }
+        .modal.open { display: flex; opacity: 1; }
+        .modal-content { background: white; border-radius: 1rem; max-width: 90%; width: 450px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+    <!-- Load Swiper CSS and JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
 
-      <div class="swiper testimonialSwiper">
-        <div class="swiper-wrapper">
-          <?php if (!empty($testimonials)): ?>
-            <?php foreach ($testimonials as $testimonial): ?>
-              <div class="swiper-slide">
-                <div class="testimonial-card h-100 shadow-lg p-5 text-center">
-                  <div class="quote-icon">
-                    <i class="bi bi-quote fs-1 text-secondary opacity-50 d-block mb-3"></i>
-                  </div>
-                  <p class="fs-5 fst-italic testimonial-quote-text">
-                    "<?php echo h($testimonial['quote_text']); ?>"
-                  </p>
-                  <div class="client-info mt-4">
-                    <h5 class="mb-0"><?php echo h($testimonial['client_name']); ?></h5>
-                    <?php if (!empty($testimonial['client_title'])): ?>
-                      <span class="text-muted small"><?php echo h($testimonial['client_title']); ?></span>
+</head>
+<body class="bg-soft-pink text-dark-text">
+
+    <?php
+        // --- 1. Database Connection and Testimonial Fetch Logic ---
+        $testimonials = [];
+        $db_error = null;
+
+        // Ensure the helper function exists, as it's used in the display loop
+        if (!function_exists('h')) {
+            function h($text) {
+                return htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            }
+        }
+        
+        // This file must exist and contain the getDBConnection() function
+        require_once 'config.php'; 
+
+        try {
+             // Establish connection using the function from config.php
+             $conn = getDBConnection(); 
+
+             // Query to fetch ONLY APPROVED testimonials (is_approved = 1)
+             $sql = "SELECT quote_text, client_name, client_title 
+                     FROM testimonials 
+                     WHERE is_approved = 1 
+                     ORDER BY testimonial_id DESC"; // Show newest first
+                     
+             $stmt = $conn->query($sql);
+             $testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        } catch (PDOException $e) {
+             // Log error for internal debugging
+             error_log("Testimonial Fetch Error: " . $e->getMessage());
+             
+             // Set a user-friendly error message
+             $db_error = "We are currently unable to load testimonials due to a server issue.";
+        }
+        
+        $has_testimonials = !empty($testimonials);
+    ?>
+
+    <!-- Testimonials Section -->
+    <section id="testimonials" class="py-12 md:py-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h4 class="text-sm font-semibold uppercase tracking-wider text-primary-pink">Testimonials</h4>
+                <h2 class="mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">Feedbacks</h2>
+                <p class="mt-4 text-xl text-gray-500">Real words from people I've worked with</p>
+                <?php if (isset($db_error)): ?>
+                    <!-- Display DB connection/query error if it occurred -->
+                    <p class="mt-4 text-red-600 font-medium bg-red-50 p-3 rounded-lg border border-red-200"><?php echo h($db_error); ?></p>
+                <?php endif; ?>
+            </div>
+
+            <div class="flex justify-center mb-8">
+                <button id="openModalBtn" class="px-6 py-3 text-lg font-medium rounded-full text-white bg-primary-pink hover:bg-pink-700 transition duration-300 shadow-md hover:shadow-lg" onclick="openModal('testimonialModal')">
+                    Submit Your Feedback
+                </button>
+            </div>
+            
+            <div class="swiper testimonialSwiper relative">
+                <div id="swiperWrapper" class="swiper-wrapper">
+                    <!-- Testimonial slides are rendered here by PHP from MySQL -->
+                    <?php if ($has_testimonials): ?>
+                        <?php foreach ($testimonials as $testimonial): ?>
+                            <div class="swiper-slide !h-auto">
+                                <div class="testimonial-card h-full shadow-xl p-8 lg:p-12 text-center flex flex-col justify-between">
+                                    <div class="quote-content">
+                                        <div class="quote-icon mb-4 flex justify-center">
+                                            <!-- Quote icon SVG for aesthetics -->
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10H5a2 2 0 00-2 2v4a2 2 0 002 2h4V10zm5-4h5a2 2 0 012 2v4a2 2 0 01-2 2h-5V6z"/>
+                                            </svg>
+                                        </div>
+                                        <p class="text-xl italic mb-6 text-gray-700">
+                                            "<?php echo h($testimonial['quote_text']); ?>"
+                                        </p>
+                                    </div>
+                                    <div class="client-info mt-auto">
+                                        <h5 class="text-lg font-semibold mb-0"><?php echo h($testimonial['client_name']); ?></h5>
+                                        <?php if (!empty($testimonial['client_title'])): ?>
+                                            <span class="text-sm text-gray-500"><?php echo h($testimonial['client_title']); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <!-- Fallback content if no approved testimonials are loaded -->
+                        <div class="swiper-slide p-6 flex justify-center items-center w-full">
+                            <div class="text-center text-gray-500 p-10 bg-white rounded-xl shadow-lg w-full max-w-lg">
+                                <p class="text-lg">No approved testimonials found yet. Be the first to share your feedback!</p>
+                            </div>
+                        </div>
                     <?php endif; ?>
-                  </div>
+
                 </div>
-              </div>
-            <?php endforeach; ?>
-          <?php else: ?>
-          <?php endif; ?>
+                <!-- Add Pagination -->
+                <div class="swiper-pagination mt-8"></div>
+            </div>
         </div>
-        <div class="swiper-pagination mt-4"></div>
-      </div>
+    </section>
 
+    <!-- Modal for Testimonial Submission -->
+    <div id="testimonialModal" class="modal" tabindex="-1" aria-labelledby="testimonialModalLabel" aria-hidden="true" role="dialog">
+        <div class="modal-content p-6">
+            <div class="flex justify-between items-center pb-4 border-b">
+                <h5 class="text-2xl font-bold" id="testimonialModalLabel">Share Your Feedback</h5>
+                <button type="button" class="text-gray-400 hover:text-gray-600 transition" onclick="closeModal('testimonialModal')" aria-label="Close">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="py-6">
+                <p id="submissionMessage" class="hidden text-center p-3 rounded-lg"></p>
+                <p class="text-sm text-gray-500 mb-4">Your submission will be reviewed and approved before being displayed on the site.</p>
+
+                <form id="testimonialForm">
+                    <div class="mb-4">
+                        <label for="modal_client_name" class="block text-sm font-medium text-gray-700 mb-1">Your Name <span class="text-red-500">*</span></label>
+                        <input type="text" class="form-control w-full" id="modal_client_name" name="client_name" required placeholder="E.g., Alex Johnson">
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="modal_client_title" class="block text-sm font-medium text-gray-700 mb-1">Your Role/Company (Optional)</label>
+                        <input type="text" class="form-control w-full" id="modal_client_title" name="client_title" placeholder="E.g., CEO, Acme Corp.">
+                    </div>
+
+                    <div class="mb-6">
+                        <label for="modal_quote_text" class="block text-sm font-medium text-gray-700 mb-1">Your Testimonial <span class="text-red-500">*</span></label>
+                        <textarea class="form-control w-full" id="modal_quote_text" name="quote_text" rows="4" required placeholder="Write your feedback here..."></textarea>
+                    </div>
+
+                    <div class="flex justify-end pt-4 border-t">
+                        <button type="button" class="px-5 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition duration-150 mr-3" onclick="closeModal('testimonialModal')">Close</button>
+                        <button type="submit" class="px-5 py-2 font-medium rounded-lg text-white bg-primary-pink hover:bg-pink-700 transition duration-150" id="submitTestimonialBtn">
+                            Submit Feedback
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-  </section>
-  <div class="modal fade" id="testimonialModal" tabindex="-1" aria-labelledby="testimonialModalLabel"    
-    aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title fw-bold" id="testimonialModalLabel">Share Your Feedback</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted small">Your submission will be reviewed and approved before being displayed on
-            the site.
-          </p>
 
-          <form id="testimonialForm">
-            <div class="mb-3">
-              <label for="modal_client_name" class="form-label">Your Name <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="modal_client_name" name="client_name" required  
-                placeholder="E.g., Alex Johnson">
-            </div>
 
-            <div class="mb-3">
-              <label for="modal_client_title" class="form-label">Your Role/Company (Optional)</label>
-              <input type="text" class="form-control" id="modal_client_title" name="client_title"        
-                placeholder="E.g., CEO, Acme Corp.">
-            </div>
+    <!-- JavaScript Setup for Swiper and AJAX Submission -->
+    <script>
+        let swiperInstance = null;
+        const form = document.getElementById('testimonialForm');
+        const submitBtn = document.getElementById('submitTestimonialBtn');
+        const messageBox = document.getElementById('submissionMessage');
+        // Ensure this matches the name of your PHP script
+        const submissionEndpoint = 'submit_testimonial.php'; 
 
-            <div class="mb-3">
-              <label for="modal_quote_text" class="form-label">Your Testimonial <span                  
-                  class="text-danger">*</span></label>
-              <textarea class="form-control" id="modal_quote_text" name="quote_text" rows="4" required    
-                placeholder="Write your feedback here..."></textarea>
-            </div>
+        // Initialize Swiper after the window loads and PHP has rendered the content
+        window.onload = function() {
+            // Count the slides rendered by PHP
+            const slides = document.querySelectorAll('#swiperWrapper .swiper-slide');
+            const numTestimonials = slides.length;
+            
+            // Only initialize Swiper if there are slides
+            if (numTestimonials > 0) {
+                swiperInstance = new Swiper(".testimonialSwiper", {
+                    slidesPerView: 1,
+                    spaceBetween: 30,
+                    // Enable looping only if there's more than one testimonial
+                    loop: numTestimonials > 1, 
+                    centeredSlides: true,
+                    pagination: {
+                        el: ".swiper-pagination",
+                        clickable: true,
+                    },
+                    autoplay: {
+                        delay: 5000,
+                        disableOnInteraction: false,
+                    },
+                    breakpoints: {
+                        640: { slidesPerView: 1.2, spaceBetween: 20, },
+                        1024: { slidesPerView: 2.2, spaceBetween: 30, },
+                    }
+                });
+            }
+        };
 
-            <div class="modal-footer px-0 pb-0 pt-3 border-top-0">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-              <button type="submit" class="btn btn-primary" id="submitTestimonialBtn"
-                style="background-color: #cd919e; border: none;">Submit
-                Feedback</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
+        // Handles the AJAX form submission to your PHP backend
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            
+            const formData = new FormData(form);
+
+            try {
+                const response = await fetch(submissionEndpoint, {
+                    method: 'POST',
+                    body: formData, 
+                });
+                
+                // Expecting a JSON response from submit_testimonial.php
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    showMessage("success", result.message, 5000);
+                    form.reset();
+                    // Close modal and remind user about the manual approval step
+                    setTimeout(() => closeModal('testimonialModal'), 1500);
+                    setTimeout(() => showMessage("info", "Remember to refresh to see the change after approval.", 7000, 'bg-blue-100 text-blue-800'), 2000);
+                } else {
+                    // Handle validation errors or database insertion errors from the PHP script
+                    throw new Error(result.message || "Server error occurred.");
+                }
+
+            } catch (error) {
+                console.error("Error adding testimonial:", error);
+                showMessage("error", `Submission failed: ${error.message}`, 5000);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Feedback';
+            }
+        });
+
+        // Helper function for custom modal messages
+        function showMessage(type, text, duration = 3000, customClasses = null) {
+            messageBox.textContent = text;
+            messageBox.className = 'text-center p-3 rounded-lg';
+
+            if (customClasses) {
+                messageBox.classList.add(...customClasses.split(' '));
+            } else if (type === "success") {
+                messageBox.classList.add('bg-green-100', 'text-green-800');
+            } else if (type === "error") {
+                messageBox.classList.add('bg-red-100', 'text-red-800');
+            } else {
+                 // info/default
+                 messageBox.classList.add('bg-gray-100', 'text-gray-700');
+            }
+            
+            messageBox.classList.remove('hidden');
+
+            clearTimeout(window.messageTimeout);
+            window.messageTimeout = setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, duration);
+        }
+
+        // Modal control functions
+        window.openModal = function(id) {
+            document.getElementById(id).classList.add('open');
+            document.body.style.overflow = 'hidden';
+            messageBox.classList.add('hidden');
+            form.reset();
+        }
+
+        window.closeModal = function(id) {
+            document.getElementById(id).classList.remove('open');
+            document.body.style.overflow = '';
+        }
+    </script>
 
   <?php include 'footer.php'; ?>
 

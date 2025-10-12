@@ -63,6 +63,9 @@ try {
     $stmt = $conn->query("SELECT * FROM inquiries ORDER BY submission_date DESC LIMIT 5");
     $recent_inquiries = $stmt->fetchAll();
 
+    $stmt = $conn->query("SELECT COUNT(*) as total FROM experiences");
+    $experienceCount = $stmt->fetch()['total'];
+
 } catch (PDOException $e) {
     error_log("Dashboard error: " . $e->getMessage());
 }
@@ -252,10 +255,7 @@ try {
                 <div class="pt-3 pb-2 mb-4 d-flex justify-content-between align-items-center">
                     <h1 class="h2 text-dark" style="font-weight: 700;">👋 Welcome,
                         <?php echo h(isset($_SESSION['full_name']) ? $_SESSION['full_name'] : 'Admin'); ?>!
-                    </h1>
-                    <button class="btn btn-primary"
-                        style="background-color: var(--color-purple-vibrant); border-color: var(--color-purple-vibrant);"><i
-                            class="bi bi-plus-circle me-2"></i>New Entry</button>
+                    </h1> 
                 </div>
 
                 <div class="row g-4 mb-5">
@@ -327,13 +327,13 @@ try {
 
                     <div class="col-6 col-md-4 col-lg-2">
                         <div class="card bg-custom-pink stat-card">
-                            <i class="bi bi-graph-up stat-icon"></i>
+                            <i class="bi bi-briefcase-fill stat-icon"></i>
                             <div class="card-body">
                                 <div>
-                                    <h5 class="card-title">Projects</h5>
-                                    <h2 class="mt-1">54</h2>
+                                    <h5 class="card-title">Experiences</h5>
+                                    <h2 class="mt-1"><?php echo $experienceCount; ?></h2>
                                 </div>
-                                <small>Total Completed</small>
+                                <small>Total Recorded</small>
                             </div>
                         </div>
                     </div>

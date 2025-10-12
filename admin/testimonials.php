@@ -27,14 +27,14 @@ unset($_SESSION['flash_message']);
 
 try {
     $conn = getDBConnection();
-    $message = '';
 
-    // --- Action Handling (Uses POST for security) ---
+    // --- Action Handling (Uses POST for security and PRG pattern) ---
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['id'])) {
         $testimonial_id = (int) $_POST['id'];
         $action = $_POST['action'];
 
         $success = false;
+        $message = '';
 
         if ($action == 'approve') {
             $stmt = $conn->prepare("UPDATE testimonials SET is_approved = 1 WHERE testimonial_id = :id");
@@ -50,14 +50,12 @@ try {
             $message = $success ? "Testimonial #{$testimonial_id} permanently **deleted**." : "Failed to delete testimonial.";
         }
 
-        // Set flash message before redirecting
-        if ($success) {
-             $_SESSION['flash_message'] = ['type' => 'success', 'content' => $message];
-        } else {
-             $_SESSION['flash_message'] = ['type' => 'danger', 'content' => $message];
-        }
+        // Set flash message before redirecting (PRG pattern)
+        $_SESSION['flash_message'] = [
+            'type' => $success ? 'success' : 'danger',
+            'content' => $message
+        ];
 
-        // Post/Redirect/Get pattern to prevent re-submission
         header('Location: testimonials.php');
         exit;
     }
@@ -82,11 +80,10 @@ try {
     <title>Manage Testimonials</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <!-- SweetAlert2 CSS added here -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
         .table-quote-preview {
-            max-width: 300px;
+            max-width: 200px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -138,7 +135,7 @@ try {
                                         <th>Client Title</th>
                                         <th>Quote Preview</th>
                                         <th class="text-center">Status</th>
-                                        <th class="text-center">Actions</th>
+                                        <th class="text-center" style="width: 150px;">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -155,7 +152,7 @@ try {
                                                 <td><?php echo h($t['client_name']); ?></td>
                                                 <td><?php echo h($t['client_title']); ?></td>
                                                 <td class="table-quote-preview" title="<?php echo h($t['quote_text']); ?>">
-                                                    <?php echo h(substr($t['quote_text'], 0, 80)) . (strlen($t['quote_text']) > 80 ? '...' : ''); ?>
+                                                    <?php echo h(substr($t['quote_text'], 0, 40)) . (strlen($t['quote_text']) > 40 ? '...' : ''); ?>
                                                 </td>
                                                 <td class="text-center">
                                                     <span
@@ -164,32 +161,15 @@ try {
                                                     </span>
                                                 </td>
                                                 <td class="text-center">
-                                                    <!-- Approve/Reject Button -->
-                                                    <?php if (!$t['is_approved']): ?>
-                                                        <button type="button"
-                                                            class="btn btn-sm btn-success me-1 action-btn"
-                                                            data-action="approve"
-                                                            data-id="<?php echo $t['testimonial_id']; ?>"
-                                                            title="Approve Testimonial">
-                                                            <i class="bi bi-check-lg"></i> Approve
-                                                        </button>
-                                                    <?php else: ?>
-                                                        <button type="button"
-                                                            class="btn btn-sm btn-secondary me-1 action-btn"
-                                                            data-action="reject"
-                                                            data-id="<?php echo $t['testimonial_id']; ?>"
-                                                            title="Reject (Mark as Pending)">
-                                                            <i class="bi bi-x-lg"></i> Reject
-                                                        </button>
-                                                    <?php endif; ?>
-
-                                                    <!-- Delete Button (Triggers SweetAlert) -->
                                                     <button type="button"
-                                                        class="btn btn-sm btn-danger delete-btn"
+                                                        class="btn btn-sm btn-info text-white review-btn"
                                                         data-id="<?php echo $t['testimonial_id']; ?>"
                                                         data-name="<?php echo h($t['client_name']); ?>"
-                                                        title="Delete Testimonial">
-                                                        <i class="bi bi-trash"></i> Delete
+                                                        data-title="<?php echo h($t['client_title']); ?>"
+                                                        data-quote-full="<?php echo h($t['quote_text']); ?>"
+                                                        data-is-approved="<?php echo (int)$t['is_approved']; ?>"
+                                                        title="Review and Act">
+                                                        <i class="bi bi-search"></i> Review
                                                     </button>
                                                 </td>
                                             </tr>
@@ -204,17 +184,12 @@ try {
         </div>
     </div>
 
-    <!-- 1. Hidden POST Form for Actions (Approve/Reject/Delete) -->
-    <!-- This form is submitted via JavaScript to ensure POST method is used -->
     <form id="actionForm" method="POST" action="testimonials.php" style="display: none;">
         <input type="hidden" name="action" id="formAction">
         <input type="hidden" name="id" id="formId">
     </form>
 
-    <!-- The custom Bootstrap delete modal HTML was removed here -->
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- SweetAlert2 JS added here -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -222,36 +197,90 @@ try {
             const formAction = document.getElementById('formAction');
             const formId = document.getElementById('formId');
 
-            // --- 1. Handle Approve/Reject Actions via POST ---
-            document.querySelectorAll('.action-btn').forEach(button => {
-                button.addEventListener('click', function() {
-                    formAction.value = this.getAttribute('data-action');
-                    formId.value = this.getAttribute('data-id');
-                    actionForm.submit();
-                });
-            });
+            // Helper to submit the hidden form
+            function submitAction(id, action) {
+                formAction.value = action;
+                formId.value = id;
+                actionForm.submit();
+            }
 
-            // --- 2. Handle SweetAlert Delete Confirmation and Submission ---
-            document.querySelectorAll('.delete-btn').forEach(button => {
+            // --- Combined Review and Action SweetAlert (using radio input) ---
+            document.querySelectorAll('.review-btn').forEach(button => {
                 button.addEventListener('click', function() {
                     const id = this.getAttribute('data-id');
                     const name = this.getAttribute('data-name');
+                    const title = this.getAttribute('data-title');
+                    const quoteFull = this.getAttribute('data-quote-full');
+                    const isApproved = parseInt(this.getAttribute('data-is-approved'));
+
+                    // Escape HTML for display in SweetAlert HTML content
+                    const escapedQuote = quoteFull.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                    const escapedName = name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+                    const escapedTitle = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+                    // Define the action options
+                    const inputOptions = {
+                        'approve': 'Approve (Publish to site)',
+                        'reject': 'Reject (Mark as pending)',
+                        'delete': 'Permanently Delete'
+                    };
+
+                    // Set the default action based on current status
+                    const defaultAction = isApproved ? 'reject' : 'approve';
 
                     Swal.fire({
-                        title: 'Are you sure?',
-                        html: `You are about to permanently delete the testimonial from <strong>${name}</strong> (ID: ${id}).`,
-                        icon: 'warning',
+                        title: `Review Testimonial #${id}`,
+                        icon: 'info',
+                        html: `
+                            <div class="text-start">
+                                <p class="text-muted mb-1">Current Status: <strong>${isApproved ? 'Approved' : 'Pending'}</strong></p>
+                                <hr>
+                                <p class="fs-6 mb-0">"${escapedQuote}"</p>
+                                <footer class="blockquote-footer mt-2">
+                                    ${escapedName}, <cite>${escapedTitle}</cite>
+                                </footer>
+                                <hr>
+                                <p class="mb-2">Select an action:</p>
+                            </div>
+                        `,
+                        input: 'radio',
+                        inputOptions: inputOptions,
+                        inputValue: defaultAction, // Pre-select the most likely action
                         showCancelButton: true,
-                        confirmButtonColor: '#dc3545', // Bootstrap Danger
-                        cancelButtonColor: '#6c757d', // Bootstrap Secondary
-                        confirmButtonText: '<i class="bi bi-trash"></i> Yes, delete it!',
-                        cancelButtonText: '<i class="bi bi-x-lg"></i> Cancel'
+                        confirmButtonText: '<i class="bi bi-lightning-charge"></i> Execute Action',
+                        cancelButtonText: '<i class="bi bi-x-circle"></i> Cancel',
+                        reverseButtons: true,
+                        preConfirm: (selectedAction) => {
+                            if (!selectedAction) {
+                                Swal.showValidationMessage('Please select an action to proceed.');
+                                return false;
+                            }
+                            return selectedAction;
+                        }
                     }).then((result) => {
-                        // Check if the user confirmed the action
                         if (result.isConfirmed) {
-                            formAction.value = 'delete';
-                            formId.value = id;
-                            actionForm.submit();
+                            const action = result.value;
+                            
+                            // For Delete action, show a FINAL confirmation prompt
+                            if (action === 'delete') {
+                                Swal.fire({
+                                    title: 'Confirm Delete',
+                                    text: `Are you absolutely sure you want to permanently delete testimonial #${id} from ${name}? This cannot be undone.`,
+                                    icon: 'warning',
+                                    showCancelButton: true,
+                                    confirmButtonColor: '#dc3545',
+                                    cancelButtonColor: '#6c757d',
+                                    confirmButtonText: '<i class="bi bi-trash"></i> Yes, Delete It!',
+                                    cancelButtonText: '<i class="bi bi-x-lg"></i> Cancel'
+                                }).then((deleteResult) => {
+                                    if (deleteResult.isConfirmed) {
+                                        submitAction(id, action);
+                                    }
+                                });
+                            } else {
+                                // Approve or Reject action is executed immediately
+                                submitAction(id, action);
+                            }
                         }
                     });
                 });
