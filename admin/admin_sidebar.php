@@ -77,12 +77,17 @@ if (isset($conn)) {
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link <?php echo is_active('experiences.php'); ?>" href="experiences.php">
+                <a class="nav-link <?php echo is_active('resume_management.php'); ?>" href="resume_management.php">
                     <i class="bi bi-briefcase"></i>
-                    <span>Experiences</span>
+                    <span>Resume/CV</span>
                 </a>
             </li>
             
+            <li class="nav-item">
+                <a class="nav-link <?php echo is_active('manage_applications.php'); ?>" href="manage_applications.php">
+                    <i class="bi bi-megaphone"></i> <span>Applications</span>
+                </a>
+            </li>
             <h6 class="sidebar-heading">
                 <span>System</span>
             </h6>
