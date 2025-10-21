@@ -1,7 +1,6 @@
 <?php
 require_once '../config.php';
 
-// FIX: Define the h() helper function for HTML escaping, which is missing.
 if (!function_exists('h')) {
     function h($text)
     {
@@ -9,13 +8,11 @@ if (!function_exists('h')) {
     }
 }
 
-// Check for authentication
 if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
     header('Location: login.php');
     exit;
 }
 
-// Ensure session variables for full_name are set, otherwise load them
 if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
     try {
         $conn = getDBConnection();
@@ -26,21 +23,16 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
             $_SESSION['full_name'] = $user['first_name'] . ' ' . $user['last_name'];
         }
     } catch (PDOException $e) {
-        // You should not use getDBConnection() inside the try block without knowing if it throws exceptions, 
-        // but given the context, we'll assume it's safe.
         error_log("Dashboard session load error: " . $e->getMessage());
     }
 }
 
-
-// Initialize variables
 $total_inquiries = $unread_inquiries = $total_portraits = $total_videos = $total_partners = $approved_testimonials = 0;
 $recent_inquiries = [];
 
 try {
     $conn = getDBConnection();
 
-    // Get statistics
     $stmt = $conn->query("SELECT COUNT(*) as total FROM inquiries");
     $total_inquiries = $stmt->fetch()['total'];
 
@@ -59,7 +51,6 @@ try {
     $stmt = $conn->query("SELECT COUNT(*) as total FROM testimonials WHERE is_approved = 1");
     $approved_testimonials = $stmt->fetch()['total'];
 
-    // Get recent inquiries
     $stmt = $conn->query("SELECT * FROM inquiries ORDER BY submission_date DESC LIMIT 5");
     $recent_inquiries = $stmt->fetchAll();
 
@@ -69,6 +60,8 @@ try {
 } catch (PDOException $e) {
     error_log("Dashboard error: " . $e->getMessage());
 }
+
+$currentPage = 'dashboard.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -77,317 +70,339 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Jade Salvador</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="css/admin-styles.css" rel="stylesheet"> 
+    <?php include 'admin_header.php'; ?> 
 
     <style>
-        :root {
-            /* Define a vibrant color palette */
-            --color-red-vibrant: #FF6B6B;
-            --color-purple-vibrant: #8338EC;
-            --color-blue-vibrant: #3A86FF;
-            --color-green-vibrant: #6AFA7F;
-            --color-yellow-vibrant: #FFBE0B;
-            --color-pink-vibrant: #FB5607;
-            --bg-light: #f4f6f9;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background-color: var(--bg-light);
-        }
-
-        .main-content {
-            padding-left: 1rem;
-        }
-
-        /* 🎨 FINAL TOUCH: Making the sidebar visually distinct from the main content */
-        .sidebar {
-            background-color: #ffffff;
-            /* White sidebar */
-            border-right: 1px solid #e9ecef;
-            min-height: 100vh;
-        }
-
-        /* Styling for the colorful stat cards */
         .stat-card {
-            color: #fff !important;
+            border-radius: 16px;
+            padding: 1.5rem;
             border: none;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            transition: transform 0.2s, box-shadow 0.2s;
-            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s ease;
             position: relative;
+            overflow: hidden;
+            background: var(--card-bg);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--stat-color-start), var(--stat-color-end));
         }
 
         .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
         }
 
-        .stat-card .card-body {
-            padding: 1rem;
+        .stat-card.card-inquiries {
+            --stat-color-start: #FF6B6B;
+            --stat-color-end: #FF8E8E;
+        }
+
+        .stat-card.card-portraits {
+            --stat-color-start: #4ECDC4;
+            --stat-color-end: #6FE3D9;
+        }
+
+        .stat-card.card-videos {
+            --stat-color-start: #A78BFA;
+            --stat-color-end: #C4B5FD;
+        }
+
+        .stat-card.card-testimonials {
+            --stat-color-start: #10B981;
+            --stat-color-end: #34D399;
+        }
+
+        .stat-card.card-partners {
+            --stat-color-start: #FBBF24;
+            --stat-color-end: #FCD34D;
+        }
+
+        .stat-card.card-experiences {
+            --stat-color-start: #fa13f6ff;
+            --stat-color-end: #9e1b79ff;
+        }
+
+        .stat-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 14px;
             display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            min-height: 120px;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--stat-color-start), var(--stat-color-end));
+            color: white;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
         }
 
-        .stat-card .card-title {
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 0.25rem;
-        }
-
-        .stat-card h2 {
-            font-size: 2.25rem;
-            font-weight: 700;
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
             line-height: 1;
+            margin: 0.5rem 0;
         }
 
-        .stat-card small {
-            opacity: 0.8;
-            font-size: 0.8rem;
+        .stat-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        /* Custom color definitions */
-        .bg-custom-red {
-            background-color: var(--color-red-vibrant) !important;
+        .stat-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--stat-color-start), var(--stat-color-end));
+            color: white;
+            margin-top: 0.5rem;
         }
 
-        .bg-custom-purple {
-            background-color: var(--color-purple-vibrant) !important;
+        .page-title {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
-        .bg-custom-blue {
-            background-color: var(--color-blue-vibrant) !important;
-        }
-
-        .bg-custom-green {
-            background-color: var(--color-green-vibrant) !important;
-        }
-
-        .bg-custom-yellow {
-            background-color: var(--color-yellow-vibrant) !important;
-        }
-
-        .bg-custom-pink {
-            background-color: var(--color-pink-vibrant) !important;
-        }
-
-
-        /* Icon overlay for visual interest */
-        .stat-card .stat-icon {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            font-size: 3rem;
-            opacity: 0.2;
-            color: #fff;
-        }
-
-        /* Table styling for better visual separation */
-        .table-card {
+        .page-title-icon {
+            width: 48px;
+            height: 48px;
             border-radius: 12px;
+            background: linear-gradient(135deg, var(--jade-primary), var(--jade-primary-hover));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .table-card {
+            border-radius: 16px;
             overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
         }
 
         .table-card .card-header {
-            background-color: #fff;
-            border-bottom: 1px solid #e9ecef;
+            background-color: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.25rem 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge.status-new {
+            background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+            color: white;
+        }
+
+        .status-badge.status-read {
+            background: linear-gradient(135deg, #10B981, #34D399);
+            color: white;
+        }
+
+        .btn-action {
+            padding: 8px 16px;
+            border-radius: 10px;
             font-weight: 600;
-            color: #343a40;
+            transition: all 0.3s ease;
+            border: none;
         }
 
-        /* Highlight unread row more clearly */
-        .table-warning.bg-opacity-10 {
-            background-color: rgba(255, 193, 7, 0.15) !important;
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
 
-        /* Badges for status */
-        .badge.bg-danger {
-            background-color: var(--color-red-vibrant) !important;
+        .inquiry-type-badge {
+            background: var(--jade-primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
 
-        .badge.bg-success {
-            background-color: var(--color-green-vibrant) !important;
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
         }
 
-        .badge.bg-primary {
-            background-color: var(--color-blue-vibrant) !important;
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
         }
 
-        /* 📱 RESPONSIVENESS FIXES */
-        /* Sidebar on small screens (Bootstrap 5 already helps, but for clarity) */
         @media (max-width: 768px) {
-            .sidebar {
-                padding-top: 56px;
-                /* Offset for a fixed navbar/header if present */
-                position: fixed;
-                top: 0;
-                bottom: 0;
-                left: 0;
-                z-index: 100;
-                width: 250px;
-                display: none;
-                /* Usually shown with a toggle on small screens */
+            .stat-value {
+                font-size: 2rem;
             }
 
-            .main-content {
-                margin-left: 0 !important;
+            .page-title {
+                font-size: 1.5rem;
             }
         }
     </style>
 </head>
 
 <body>
-    <?php include 'admin_header.php'; ?>
-
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-3 col-lg-2 sidebar">
-                <?php include 'admin_sidebar.php'; ?>
-            </div>
+            <?php include 'admin_sidebar.php'; ?>
 
-            <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
-                <div class="pt-3 pb-2 mb-4 d-flex justify-content-between align-items-center">
-                    <h1 class="h2 text-dark" style="font-weight: 700;">👋 Welcome,
-                        <?php echo h(isset($_SESSION['full_name']) ? $_SESSION['full_name'] : 'Admin'); ?>!
-                    </h1> 
+            <main class="main-content">
+                <div class="page-title">
+                    <div class="page-title-icon">
+                        <i class="bi bi-grid-3x3-gap-fill"></i>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9rem; color: var(--text-secondary); font-weight: 500;">Welcome back,
+                        </div>
+                        <div><?php echo h($_SESSION['full_name'] ?? 'Admin'); ?></div>
+                    </div>
                 </div>
 
                 <div class="row g-4 mb-5">
-
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card bg-custom-red stat-card">
-                            <i class="bi bi-chat-dots stat-icon"></i>
-                            <div class="card-body">
-                                <div>
-                                    <h5 class="card-title">Inquiries</h5>
-                                    <h2 class="mt-1"><?php echo $total_inquiries; ?></h2>
-                                </div>
-                                <small class="fw-bold"><?php echo $unread_inquiries; ?> NEW unread</small>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                        <div class="stat-card card-inquiries">
+                            <div class="stat-icon">
+                                <i class="bi bi-chat-dots-fill"></i>
                             </div>
+                            <div class="stat-value"><?php echo $total_portraits; ?></div>
+                            <div class="stat-label">Portraits</div>
                         </div>
                     </div>
 
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card bg-custom-blue stat-card">
-                            <i class="bi bi-camera stat-icon"></i>
-                            <div class="card-body">
-                                <div>
-                                    <h5 class="card-title">Portraits</h5>
-                                    <h2 class="mt-1"><?php echo $total_portraits; ?></h2>
-                                </div>
-                                <small>Total Photos Listed</small>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                        <div class="stat-card card-videos">
+                            <div class="stat-icon">
+                                <i class="bi bi-film"></i>
                             </div>
+                            <div class="stat-value"><?php echo $total_videos; ?></div>
+                            <div class="stat-label">Videos</div>
                         </div>
                     </div>
 
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card bg-custom-purple stat-card">
-                            <i class="bi bi-film stat-icon"></i>
-                            <div class="card-body">
-                                <div>
-                                    <h5 class="card-title">Videos</h5>
-                                    <h2 class="mt-1"><?php echo $total_videos; ?></h2>
-                                </div>
-                                <small>Total Media Assets</small>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                        <div class="stat-card card-testimonials">
+                            <div class="stat-icon">
+                                <i class="bi bi-star-fill"></i>
                             </div>
+                            <div class="stat-value"><?php echo $approved_testimonials; ?></div>
+                            <div class="stat-label">Testimonials</div>
                         </div>
                     </div>
 
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card bg-custom-green stat-card">
-                            <i class="bi bi-star stat-icon"></i>
-                            <div class="card-body">
-                                <div>
-                                    <h5 class="card-title">Testimonials</h5>
-                                    <h2 class="mt-1"><?php echo $approved_testimonials; ?></h2>
-                                </div>
-                                <small>Approved Reviews</small>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                        <div class="stat-card card-partners">
+                            <div class="stat-icon">
+                                <i class="bi bi-people-fill"></i>
                             </div>
+                            <div class="stat-value"><?php echo $total_partners; ?></div>
+                            <div class="stat-label">Partners</div>
                         </div>
                     </div>
 
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card bg-custom-yellow stat-card">
-                            <i class="bi bi-people stat-icon"></i>
-                            <div class="card-body">
-                                <div>
-                                    <h5 class="card-title">Partners</h5>
-                                    <h2 class="mt-1"><?php echo $total_partners; ?></h2>
-                                </div>
-                                <small>Companies Listed</small>
+                    <div class="col-12 col-sm-6 col-lg-4 col-xl-2">
+                        <div class="stat-card card-experiences">
+                            <div class="stat-icon">
+                                <i class="bi bi-briefcase-fill"></i>
                             </div>
+                            <div class="stat-value"><?php echo $experienceCount; ?></div>
+                            <div class="stat-label">Experiences</div>
                         </div>
                     </div>
-
-                    <div class="col-6 col-md-4 col-lg-2">
-                        <div class="card bg-custom-pink stat-card">
-                            <i class="bi bi-briefcase-fill stat-icon"></i>
-                            <div class="card-body">
-                                <div>
-                                    <h5 class="card-title">Experiences</h5>
-                                    <h2 class="mt-1"><?php echo $experienceCount; ?></h2>
-                                </div>
-                                <small>Total Recorded</small>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
-
-                <hr>
 
                 <div class="card table-card mb-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="bi bi-clipboard-check me-2"></i>Recent Inquiries (Last 5)</h5>
-                        <a href="inquiries.php" class="btn btn-sm btn-outline-secondary">View All</a>
+                        <h5 class="mb-0">
+                            <i class="bi bi-clock-history me-2"></i>Recent Inquiries
+                        </h5>
+                        <a href="inquiries.php" class="btn btn-sm btn-action"
+                            style="background: var(--jade-primary); color: white;">
+                            View All <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-hover table-striped">
-                                <thead class="table-light">
+                            <table class="table table-hover mb-0">
+                                <thead>
                                     <tr>
-                                        <th class="text-secondary" scope="col">Date</th>
-                                        <th class="text-secondary" scope="col">Name</th>
-                                        <th class="text-secondary" scope="col">Email</th>
-                                        <th class="text-secondary" scope="col">Type</th>
-                                        <th class="text-secondary" scope="col">Status</th>
-                                        <th class="text-secondary" scope="col">Action</th>
+                                        <th>Date</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Type</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php if (empty($recent_inquiries)): ?>
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted py-3">No recent inquiries found.
+                                            <td colspan="6">
+                                                <div class="empty-state">
+                                                    <i class="bi bi-inbox"></i>
+                                                    <p class="mb-0">No recent inquiries found.</p>
+                                                </div>
                                             </td>
                                         </tr>
                                     <?php else: ?>
                                         <?php foreach ($recent_inquiries as $inquiry): ?>
-                                            <tr class="<?php echo $inquiry['is_read'] ? '' : 'table-warning bg-opacity-10'; ?>">
+                                            <tr>
                                                 <td><?php echo date('M d, Y', strtotime($inquiry['submission_date'])); ?></td>
                                                 <td class="fw-bold"><?php echo h($inquiry['full_name']); ?></td>
                                                 <td><?php echo h($inquiry['email']); ?></td>
-                                                <td><span
-                                                        class="badge rounded-pill bg-primary"><?php echo h($inquiry['inquiry_type']); ?></span>
+                                                <td>
+                                                    <span
+                                                        class="inquiry-type-badge"><?php echo h($inquiry['inquiry_type']); ?></span>
                                                 </td>
                                                 <td>
                                                     <?php if ($inquiry['is_read']): ?>
-                                                        <span class="badge bg-success"><i
-                                                                class="bi bi-check-circle-fill me-1"></i>Read</span>
+                                                        <span class="status-badge status-read">
+                                                            <i class="bi bi-check-circle-fill"></i> Read
+                                                        </span>
                                                     <?php else: ?>
-                                                        <span class="badge bg-danger"><i
-                                                                class="bi bi-exclamation-circle-fill me-1"></i>New</span>
+                                                        <span class="status-badge status-new">
+                                                            <i class="bi bi-exclamation-circle-fill"></i> New
+                                                        </span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
                                                     <a href="view_inquiry.php?id=<?php echo $inquiry['inquiry_id']; ?>"
-                                                        class="btn btn-sm btn-outline-dark" title="View Inquiry"><i
-                                                            class="bi bi-eye"></i> View</a>
+                                                        class="btn btn-sm btn-action"
+                                                        style="background: var(--jade-primary); color: white;">
+                                                        <i class="bi bi-eye"></i> View
+                                                    </a>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>

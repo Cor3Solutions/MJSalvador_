@@ -3,6 +3,7 @@
 
 // --- Configuration and Dependencies ---
 require_once '../config.php'; // Assumes this provides getDBConnection()
+require_once 'includes/archive_functions.php';
 
 // Helper function for HTML escaping
 if (!function_exists('h')) {
@@ -23,15 +24,16 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
     exit;
 }
 
+// Define current page for sidebar activation
+$currentPage = 'experiences.php';
+
 // --- Initialization ---
 $experiences = [];
 $error = '';
-// Retrieve and consume the flash message
 $flash_message = $_SESSION['flash_message'] ?? null;
 unset($_SESSION['flash_message']);
 
-// NEW: Define the list of controlled categories based on user request
-// These will populate the dropdown and are used for organizing the public-facing CV
+// Define the list of controlled categories
 $category_options = [
     "Professional Experience",
     "Events & Modeling - Modeled & Ushered For",
@@ -45,43 +47,31 @@ $category_options = [
 try {
     $conn = getDBConnection();
 
-    // --- Action Handling (C, U, D via POST) ---
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $action = $_POST['action'] ?? '';
+    // ===============================================
+    // 1. HANDLE POST SUBMISSION (CREATE or UPDATE)
+    // ===============================================
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+        
+        $action = $_POST['action'];
         $success = false;
         $message_content = '';
-        $redirect = true;
-
-        // --- DELETE Action ---
-        if ($action === 'delete' && !empty($_POST['exp_id'])) {
-            $exp_id = (int) $_POST['exp_id'];
-            // Added simple check to prevent deleting ID 0 if not necessary
-            if ($exp_id > 0) {
-                $stmt = $conn->prepare("DELETE FROM experiences WHERE exp_id = :id");
-                $success = $stmt->execute([':id' => $exp_id]);
-                $message_content = $success ? "Experience #{$exp_id} successfully **deleted**." : "Failed to delete experience.";
-            } else {
-                $success = false;
-                $message_content = "Invalid experience ID for deletion.";
-            }
-
-        }
-        // --- CREATE or UPDATE Action ---
-        elseif (in_array($action, ['create', 'update'])) {
+        $redirect = true; // Default to redirect
+        
+        // Handle CREATE or UPDATE
+        if (in_array($action, ['create', 'update'])) {
             
             // 1. Input Validation and Sanitization
             $errors = [];
             $exp_id = ($action === 'update' && isset($_POST['exp_id'])) ? (int)$_POST['exp_id'] : null;
 
-            $title       = trim($_POST['title'] ?? '');
-            $subtitle    = trim($_POST['subtitle'] ?? '');
-            $category    = trim($_POST['category'] ?? '');
-            $date_range  = trim($_POST['date_range'] ?? '');
-            $details     = trim($_POST['details'] ?? ''); // Details can contain line breaks, don't strip
+            $title      = trim($_POST['title'] ?? '');
+            $subtitle   = trim($_POST['subtitle'] ?? '');
+            $category   = trim($_POST['category'] ?? '');
+            $date_range = trim($_POST['date_range'] ?? '');
+            $details    = trim($_POST['details'] ?? '');
             $sort_order = filter_var($_POST['sort_order'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
 
-            if (empty($title))       $errors[] = "Title is required.";
-            // Validate category: must be selected from the defined list
+            if (empty($title))     $errors[] = "Title is required.";
             if (!in_array($category, $category_options)) $errors[] = "Category is required and must be selected from the predefined list.";
             if ($sort_order === false || $sort_order === null) $errors[] = "Sort Order must be a non-negative integer.";
 
@@ -98,11 +88,11 @@ try {
                     $success = $stmt->execute($params);
                     $message_content = $success ? "Experience #{$exp_id} successfully **updated**." : "Failed to update experience.";
                 } else {
-                     $success = false;
-                     $message_content = "Invalid action or missing experience ID for update.";
+                    $success = false;
+                    $message_content = "Invalid action or missing experience ID for update.";
                 }
             } else {
-                // If validation fails, set the error and **DO NOT REDIRECT**
+                // Validation failed: Do not redirect (PRG fail)
                 $success = false;
                 $message_content = "Validation Error: " . implode(' ', $errors);
                 $redirect = false;
@@ -110,38 +100,166 @@ try {
                 $_SESSION['post_data'] = $_POST;
             }
         }
+        
+        // Handle DELETE (Moved to POST to follow PRG, though the original was POST-based)
+        elseif ($action === 'delete' && !empty($_POST['exp_id'])) {
+            $exp_id = (int) $_POST['exp_id'];
+            if ($exp_id > 0) {
+                $stmt = $conn->prepare("DELETE FROM experiences WHERE exp_id = :id");
+                $success = $stmt->execute([':id' => $exp_id]);
+                $message_content = $success ? "Experience #{$exp_id} successfully **deleted**." : "Failed to delete experience.";
+            } else {
+                $success = false;
+                $message_content = "Invalid experience ID for deletion.";
+            }
+        }
 
         // Set flash message
         $flash_message_type = $success ? 'success' : 'danger';
         $_SESSION['flash_message'] = ['type' => $flash_message_type, 'content' => $message_content];
 
-        // Post/Redirect/Get pattern: Only redirect on success or non-validation errors
+        // Post/Redirect/Get pattern: Redirect on success or non-validation errors
         if ($redirect) {
             header('Location: experiences.php');
             exit;
         } else {
-             // If validation failed, clear the flash message to handle it below,
-             // but keep the post data for the form.
+             // If validation failed, set $error to display it immediately
              $error = $message_content;
-             $flash_message = null; // Prevent showing flash message and error block
+             $flash_message = null; 
         }
     }
 
-    // --- Data Fetching (Read) ---
-    // Fetch all experiences, sorted by category and sort_order
+    // ===============================================
+    // 2. Data Fetching (Read)
+    // ===============================================
     $stmt = $conn->query("SELECT * FROM experiences ORDER BY category ASC, sort_order ASC");
     $experiences = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (PDOException $e) {
-    // Log the error for internal debugging
     error_log("Experiences error: " . $e->getMessage());
     $error = 'Database error: Could not load experiences. Please check server logs.';
 }
 
-// Handle non-redirected POST data for re-populating the form on validation error
-$post_data = $_SESSION['post_data'] ?? null;
-unset($_SESSION['post_data']);
+// ===============================================
+// 3. Determine Form Data for Edit/New Mode
+// ===============================================
+// Check for a GET request with an ID (for initial edit load)
+$edit_exp_id = (int)($_GET['id'] ?? 0);
+$form_data = [];
+$form_action = 'create';
 
+// Check for re-posted data from a failed validation (takes precedence over GET ID)
+if (isset($_SESSION['post_data'])) {
+    $form_data = $_SESSION['post_data'];
+    $edit_exp_id = (int)($form_data['exp_id'] ?? 0);
+    $form_action = $form_data['action'] ?? 'create';
+    unset($_SESSION['post_data']); // Clear session data
+} 
+// If no reposted data, check for GET ID
+elseif ($edit_exp_id > 0) {
+    try {
+        $stmt = $conn->prepare("SELECT * FROM experiences WHERE exp_id = :id");
+        $stmt->execute([':id' => $edit_exp_id]);
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($data) {
+            $form_data = $data;
+            $form_action = 'update';
+        } else {
+            // ID not found, switch to New mode
+            $edit_exp_id = 0;
+            $form_action = 'create';
+        }
+    } catch(PDOException $e) {
+        $error = 'Error loading data for edit: ' . $e->getMessage();
+        $edit_exp_id = 0;
+        $form_action = 'create';
+    }
+}
+
+// ===============================================
+// PHP FUNCTION TO RENDER THE FORM (Inline use)
+// ===============================================
+function render_experience_form_inline($data, $exp_id, $action, $category_options) {
+    // Determine title and button text
+    $is_edit = $action === 'update' && $exp_id > 0;
+    $card_title = $is_edit ? 'Edit Experience (ID: ' . h($exp_id) . ')' : 'Add New Experience';
+    $button_text = $is_edit ? '<i class="bi bi-floppy me-2"></i> Save Changes' : '<i class="bi bi-plus-lg me-2"></i> Create Item';
+    $button_class = $is_edit ? 'btn-warning' : 'btn-primary';
+    
+    // Default values
+    $data_title = h($data['title'] ?? '');
+    $data_subtitle = h($data['subtitle'] ?? '');
+    $data_category = h($data['category'] ?? '');
+    $data_date_range = h($data['date_range'] ?? '');
+    $data_sort_order = h($data['sort_order'] ?? 10);
+    $data_details = h($data['details'] ?? '');
+    
+    ?>
+    <div class="card shadow-lg mb-4">
+        <div class="card-header bg-dark text-white rounded-top-2">
+            <h5 class="mb-0 fw-bold"><?php echo $card_title; ?></h5>
+        </div>
+        <div class="card-body">
+            <form id="experienceForm" method="POST" action="experiences.php">
+                <input type="hidden" name="exp_id" value="<?php echo h($exp_id); ?>">
+                <input type="hidden" name="action" value="<?php echo h($action); ?>">
+
+                <div class="mb-3">
+                    <label for="title" class="form-label fw-bold">Title / Company Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="title" name="title" value="<?php echo $data_title; ?>" required maxlength="100">
+                </div>
+
+                <div class="mb-3">
+                    <label for="subtitle" class="form-label">Subtitle / Position / Degree</label>
+                    <input type="text" class="form-control" id="subtitle" name="subtitle" value="<?php echo $data_subtitle; ?>" maxlength="100">
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="category" class="form-label fw-bold">Category <span class="text-danger">*</span></label>
+                        <select class="form-select" id="category" name="category" required>
+                            <option value="" disabled <?php echo ($data_category === '' ? 'selected' : ''); ?>>Select a Category</option>
+                            <?php foreach ($category_options as $option): ?>
+                                <option value="<?php echo h($option); ?>" <?php echo ($data_category === $option ? 'selected' : ''); ?>>
+                                    <?php echo h($option); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="date_range" class="form-label">Date Range</label>
+                        <input type="text" class="form-control" id="date_range" name="date_range" value="<?php echo $data_date_range; ?>" maxlength="50"
+                            placeholder="e.g., 2018 - Present, Jan 2020">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="sort_order" class="form-label fw-bold">Sort Order (Lower is Higher Priority) <span class="text-danger">*</span></label>
+                    <input type="number" class="form-control" id="sort_order" name="sort_order" value="<?php echo $data_sort_order; ?>" required min="0">
+                    <small class="form-text text-muted">A lower number means it appears higher in the list.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label for="details" class="form-label">Description / Bullet Points</label>
+                    <textarea class="form-control" id="details" name="details" rows="5"><?php echo $data_details; ?></textarea>
+                    <small class="form-text text-muted">Use line breaks or markdown for formatting.</small>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn <?php echo $button_class; ?> shadow-sm py-2">
+                        <?php echo $button_text; ?>
+                    </button>
+                    <?php if ($is_edit): ?>
+                        <a href="experiences.php" class="btn btn-secondary py-2">
+                            <i class="bi bi-x-circle me-2"></i> Cancel Edit / Add New
+                        </a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+    </div>
+    <?php
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -153,12 +271,28 @@ unset($_SESSION['post_data']);
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <style>
-        .main-content {
-            padding-left: 1.5rem;
-            padding-right: 1.5rem;
+        body {
+            background-color: #f8f9fa; 
         }
-        .table td {
-            vertical-align: middle;
+        .main-content {
+            padding: 0 1rem; 
+        }
+        .content-header {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1.5rem 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,.04);
+        }
+        .card {
+            border: none;
+            border-radius: 12px; 
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08); 
+        }
+        .table thead th {
+            background-color: #f0f2f5; 
+            font-weight: 700;
         }
     </style>
 </head>
@@ -171,83 +305,90 @@ unset($_SESSION['post_data']);
             <?php include 'admin_sidebar.php'; ?>
 
             <main class="col-md-9 ms-sm-auto col-lg-10 main-content">
-                <div class="pt-3 pb-2 mb-4 border-bottom d-flex justify-content-between align-items-center">
-                    <h1 class="h2"><i class="bi bi-briefcase me-2"></i>Manage Experiences / Portfolio Items</h1>
-                    <button type="button" class="btn btn-primary" data-bs-toggle="modal"
-                        data-bs-target="#experienceModal" id="addNewBtn">
-                        <i class="bi bi-plus-lg"></i> Add New Item
-                    </button>
+                
+                <div class="content-header d-flex justify-content-between align-items-center">
+                    <h1 class="h2 fw-bolder text-dark m-0"><i class="bi bi-briefcase me-2"></i>Experience Management</h1>
+                    
+                    <?php if ($edit_exp_id > 0): ?>
+                        <a href="experiences.php" class="btn btn-success btn-lg shadow-sm">
+                            <i class="bi bi-plus-lg me-2"></i> Add New Item
+                        </a>
+                    <?php endif; ?>
                 </div>
 
-                <?php if ($error || $flash_message): ?>
-                    <div class="alert alert-<?php echo h($flash_message ? $flash_message['type'] : 'danger'); ?> alert-dismissible fade show"
-                        role="alert">
-                        <?php echo h($flash_message ? $flash_message['content'] : $error); ?>
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                <?php endif; ?>
-
-                <div class="card mb-4 shadow-sm">
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover align-middle">
-                                <thead>
-                                    <tr>
-                                        <th class="text-center">Order</th>
-                                        <th>Category</th>
-                                        <th>Title</th>
-                                        <th>Subtitle</th>
-                                        <th>Date Range</th>
-                                        <th class="text-center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (empty($experiences)): ?>
-                                        <tr>
-                                            <td colspan="6" class="text-center text-muted py-4">
-                                                <i class="bi bi-info-circle me-1"></i> No experiences found.
-                                            </td>
-                                        </tr>
-                                    <?php else: ?>
-                                        <?php foreach ($experiences as $e): ?>
-                                            <tr>
-                                                <td class="text-center"><?php echo h($e['sort_order']); ?></td>
-                                                <td><span
-                                                        class="badge bg-secondary"><?php echo h($e['category']); ?></span>
-                                                </td>
-                                                <td><?php echo h($e['title']); ?></td>
-                                                <td><?php echo h($e['subtitle']); ?></td>
-                                                <td><?php echo h($e['date_range']); ?></td>
-                                                <td class="text-center">
-                                                    <button type="button" class="btn btn-sm btn-warning me-1 edit-btn"
-                                                        data-bs-toggle="modal" data-bs-target="#experienceModal"
-                                                        data-id="<?php echo h($e['exp_id']); ?>"
-                                                        data-title="<?php echo h($e['title']); ?>"
-                                                        data-subtitle="<?php echo h($e['subtitle']); ?>"
-                                                        data-category="<?php echo h($e['category']); ?>"
-                                                        data-daterange="<?php echo h($e['date_range']); ?>"
-                                                        data-sortorder="<?php echo h($e['sort_order']); ?>"
-                                                        data-details="<?php echo h($e['details']); ?>"
-                                                        title="Edit Experience">
-                                                        <i class="bi bi-pencil"></i> Edit
-                                                    </button>
-                                                    <button type="button" class="btn btn-sm btn-danger delete-btn"
-                                                        data-id="<?php echo h($e['exp_id']); ?>"
-                                                        data-title="<?php echo h($e['title']); ?>"
-                                                        title="Delete Experience">
-                                                        <i class="bi bi-trash"></i> Delete
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
+                <div class="row px-3">
+                    <?php if ($error): ?>
+                        <div class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm" role="alert"><?php echo h($error); ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
-                    </div>
+                    <?php endif; ?>
+                    <?php if ($flash_message): ?>
+                        <div class="alert alert-<?php echo h($flash_message['type']); ?> alert-dismissible fade show rounded-3 shadow-sm" role="alert">
+                            <?php echo $flash_message['content']; ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
-            </main>
+                <div class="row px-3">
+                    
+                    <div class="col-lg-4 col-md-12">
+                        <?php render_experience_form_inline($form_data, $edit_exp_id, $form_action, $category_options); ?>
+                    </div>
+
+                    <div class="col-lg-8 col-md-12">
+                        <div class="card mb-5 shadow-lg">
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-hover align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th class="text-center py-3">Order</th>
+                                                <th class="py-3">Category</th>
+                                                <th class="py-3">Title</th>
+                                                <th class="py-3">Date Range</th>
+                                                <th class="text-center py-3">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php if (empty($experiences)): ?>
+                                                <tr>
+                                                    <td colspan="5" class="text-center text-muted py-4">
+                                                        <i class="bi bi-info-circle me-1"></i> No experiences found.
+                                                    </td>
+                                                </tr>
+                                            <?php else: ?>
+                                                <?php foreach ($experiences as $e): ?>
+                                                    <tr>
+                                                        <td class="text-center">
+                                                             <span class="badge bg-secondary"><?php echo h($e['sort_order']); ?></span>
+                                                        </td>
+                                                        <td><span class="badge bg-info text-dark"><?php echo h($e['category']); ?></span></td>
+                                                        <td class="fw-semibold">
+                                                            <?php echo h($e['title']); ?>
+                                                            <small class="d-block text-muted"><?php echo h($e['subtitle']); ?></small>
+                                                        </td>
+                                                        <td><?php echo h($e['date_range']); ?></td>
+                                                        <td class="text-center">
+                                                            <a href="?id=<?php echo $e['exp_id']; ?>" class="btn btn-sm btn-warning me-1 text-white" title="Edit Experience"> 
+                                                                <i class="bi bi-pencil"></i> Edit
+                                                            </a>
+                                                            <button type="button" class="btn btn-sm btn-danger delete-btn"
+                                                                data-id="<?php echo h($e['exp_id']); ?>"
+                                                                data-title="<?php echo h($e['title']); ?>"
+                                                                title="Delete Experience">
+                                                                <i class="bi bi-trash"></i> Delete
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            <?php endif; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div></div></main>
         </div>
     </div>
 
@@ -256,141 +397,15 @@ unset($_SESSION['post_data']);
         <input type="hidden" name="exp_id" id="deleteFormId">
     </form>
 
-    <div class="modal fade" id="experienceModal" tabindex="-1" aria-labelledby="experienceModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <form id="experienceForm" method="POST" action="experiences.php">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title" id="experienceModalLabel">Add New Experience</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                            aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-
-                        <input type="hidden" name="exp_id" id="exp_id_field">
-                        <input type="hidden" name="action" id="action_field">
-
-                        <div class="mb-3">
-                            <label for="title" class="form-label">Title / Company Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="title" name="title" required maxlength="100">
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="subtitle" class="form-label">Subtitle / Position / Degree</label>
-                            <input type="text" class="form-control" id="subtitle" name="subtitle" maxlength="100">
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="category" class="form-label">Category <span class="text-danger">*</span></label>
-                                <!-- UPDATED: Replaced text input with select dropdown for controlled categories -->
-                                <select class="form-select" id="category" name="category" required>
-                                    <option value="" disabled selected>Select a Category</option>
-                                    <?php foreach ($category_options as $option): ?>
-                                        <option value="<?php echo h($option); ?>"><?php echo h($option); ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="date_range" class="form-label">Date Range</label>
-                                <input type="text" class="form-control" id="date_range" name="date_range" maxlength="50"
-                                    placeholder="e.g., 2018 - Present, Jan 2020">
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="sort_order" class="form-label">Sort Order (Lower is Higher Priority) <span class="text-danger">*</span></label>
-                            <input type="number" class="form-control" id="sort_order" name="sort_order" required min="0" value="10">
-                            <small class="form-text text-muted">A lower number means it appears higher in the list.</small>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="details" class="form-label">Description / Bullet Points</label>
-                            <textarea class="form-control" id="details" name="details" rows="5"></textarea>
-                            <small class="form-text text-muted">Use line breaks or markdown for formatting.</small>
-                        </div>
-
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary" id="modalSaveButton">Save changes</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            const modal = document.getElementById('experienceModal');
-            const modalTitle = document.getElementById('experienceModalLabel');
-            const form = document.getElementById('experienceForm');
-            const expIdField = document.getElementById('exp_id_field');
-            const actionField = document.getElementById('action_field');
-            const modalSaveButton = document.getElementById('modalSaveButton');
             const deleteForm = document.getElementById('deleteForm');
             const deleteFormId = document.getElementById('deleteFormId');
             
-            // Bootstrap Modal instance for programatic control
-            const experienceModal = new bootstrap.Modal(modal);
-
-            // Function to reset the form for "Add" mode
-            function resetForm() {
-                form.reset();
-                expIdField.value = '';
-                actionField.value = 'create';
-                modalTitle.textContent = 'Add New Experience';
-                modalSaveButton.textContent = 'Create Item';
-                modalSaveButton.classList.remove('btn-warning');
-                modalSaveButton.classList.add('btn-primary');
-                // Ensure the select defaults to the placeholder
-                document.getElementById('category').value = "";
-            }
-
-            // Function to populate and switch to "Edit" mode
-            function populateFormForEdit(data) {
-                modalTitle.textContent = `Edit Experience (ID: ${data.id})`;
-                modalSaveButton.textContent = 'Save Changes';
-                modalSaveButton.classList.remove('btn-primary');
-                modalSaveButton.classList.add('btn-warning');
-
-                // Populate form fields
-                document.getElementById('title').value = data.title;
-                document.getElementById('subtitle').value = data.subtitle;
-                // This line now sets the value of the <select>
-                document.getElementById('category').value = data.category;
-                document.getElementById('date_range').value = data.daterange;
-                document.getElementById('sort_order').value = data.sortorder;
-                document.getElementById('details').value = data.details;
-
-                // Set hidden fields for update action
-                expIdField.value = data.id;
-                actionField.value = 'update';
-            }
-
-            // 1. Handle "Add New Item" button click
-            document.getElementById('addNewBtn').addEventListener('click', resetForm);
-
-            // 2. Handle "Edit" button clicks
-            document.querySelectorAll('.edit-btn').forEach(button => {
-                button.addEventListener('click', function () {
-                    const data = {
-                        id: this.getAttribute('data-id'),
-                        title: this.getAttribute('data-title'),
-                        subtitle: this.getAttribute('data-subtitle'),
-                        category: this.getAttribute('data-category'),
-                        daterange: this.getAttribute('data-daterange'),
-                        sortorder: this.getAttribute('data-sortorder'),
-                        details: this.getAttribute('data-details')
-                    };
-                    populateFormForEdit(data);
-                });
-            });
-
-            // 3. SweetAlert for Delete Confirmation
+            // SweetAlert for Delete Confirmation
             document.querySelectorAll('.delete-btn').forEach(button => {
                 button.addEventListener('click', function () {
                     const id = this.getAttribute('data-id');
@@ -413,37 +428,6 @@ unset($_SESSION['post_data']);
                     });
                 });
             });
-            
-            // 4. Handle failed validation, re-open modal with POST data if available
-            <?php if (!empty($post_data) && $error): ?>
-                // Data structure mimics the data attributes on the edit button
-                const postData = {
-                    id: '<?php echo h($post_data['exp_id'] ?? ''); ?>',
-                    title: '<?php echo h($post_data['title'] ?? ''); ?>',
-                    subtitle: '<?php echo h($post_data['subtitle'] ?? ''); ?>',
-                    category: '<?php echo h($post_data['category'] ?? ''); ?>',
-                    daterange: '<?php echo h($post_data['date_range'] ?? ''); ?>',
-                    sortorder: '<?php echo h($post_data['sort_order'] ?? ''); ?>',
-                    details: `<?php echo addslashes(h($post_data['details'] ?? '')); ?>` // Handle new lines and escaping
-                };
-
-                // Decide between Create/Update based on the action field
-                if ('<?php echo h($post_data['action'] ?? ''); ?>' === 'update' && postData.id) {
-                    populateFormForEdit(postData);
-                } else {
-                    resetForm();
-                    // Manually populate fields that resetForm cleared, just to be safe
-                    document.getElementById('title').value = postData.title;
-                    document.getElementById('subtitle').value = postData.subtitle;
-                    document.getElementById('category').value = postData.category;
-                    document.getElementById('date_range').value = postData.daterange;
-                    document.getElementById('sort_order').value = postData.sortorder;
-                    document.getElementById('details').value = postData.details;
-                }
-                
-                // Show the modal
-                experienceModal.show();
-            <?php endif; ?>
         });
     </script>
 </body>

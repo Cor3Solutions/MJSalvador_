@@ -3,7 +3,8 @@ require_once 'config.php';
 
 // Helper function for security: HTML-escape data
 if (!function_exists('h')) {
-    function h($string) {
+    function h($string)
+    {
         return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
     }
 }
@@ -45,6 +46,12 @@ try {
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
         rel="stylesheet">
 </head>
+<style>
+    .page-header {
+        background: url('images/cover.png') center center/cover no-repeat;
+        height: 400px;
+    }
+</style>
 
 <body>
     <?php include 'navbar.php'; ?>
@@ -68,10 +75,10 @@ try {
                 <div class="d-flex flex-wrap justify-content-center gap-2">
                     <!-- Default 'All' button - active state uses btn-dark -->
                     <button class="btn btn-dark filter-button active" data-filter="*">All</button>
-                    
+
                     <?php foreach ($portraitCategories as $category): ?>
-                        <button class="filter-button btn btn-outline-dark" 
-                                data-filter=".<?php echo h($category['name']); ?>">
+                        <button class="filter-button btn btn-outline-dark"
+                            data-filter=".<?php echo h($category['name']); ?>">
                             <?php echo h($category['display_name']); ?>
                         </button>
                     <?php endforeach; ?>
@@ -83,15 +90,14 @@ try {
                 <div class="isotope-container row g-4">
                     <?php foreach ($portraits as $portrait): ?>
                         <?php
-                            // Determine the CSS classes needed for filtering
-                            // IMPORTANT: The 'categories' column contains the space-separated list of categories.
-                            $filter_classes = h($portrait['categories']);
-                            if ($portrait['is_setcard']) {
-                                $filter_classes .= ' setcard';
-                            }
+                        // Determine the CSS classes needed for filtering
+                        // IMPORTANT: The 'categories' column contains the space-separated list of categories.
+                        $filter_classes = h($portrait['categories']);
+                        if ($portrait['is_setcard']) {
+                            $filter_classes .= ' setcard';
+                        }
                         ?>
-                        <div
-                            class="item <?php echo trim($filter_classes); ?> col-md-4">
+                        <div class="item <?php echo trim($filter_classes); ?> col-md-4">
                             <div class="card border-0 shadow-lg">
                                 <div class="card-img-container">
                                     <img src="<?php echo h($portrait['image_filename']); ?>"
@@ -137,7 +143,7 @@ try {
 
             $('.filter-button').on('click', function () {
                 var filterValue = $(this).attr('data-filter');
-                
+
                 // Check if Isotope has been initialized before filtering
                 if ($grid.data('isotope')) {
                     $grid.isotope({ filter: filterValue });

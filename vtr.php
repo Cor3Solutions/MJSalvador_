@@ -1,7 +1,6 @@
 <?php
 require_once 'config.php';
 
-// Helper function for security: HTML-escape data
 if (!function_exists('h')) {
     function h($string) {
         return htmlspecialchars($string ?? '', ENT_QUOTES, 'UTF-8');
@@ -11,12 +10,10 @@ if (!function_exists('h')) {
 try {
     $conn = getDBConnection();
     
-    // 1. Fetch Categories dynamically for filter buttons
     $stmt_cat = $conn->prepare("SELECT name, display_name FROM video_categories ORDER BY sort_order ASC, display_name ASC");
     $stmt_cat->execute();
     $categories = $stmt_cat->fetchAll(PDO::FETCH_ASSOC);
     
-    // 2. Fetch all videos, joining to get the category's short 'name' for filtering classes
     $stmt = $conn->prepare("
         SELECT 
             v.*, 
@@ -40,7 +37,10 @@ try {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Tape Recordings - Jade S.</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <meta name="description" content="Watch Jade Salvador's video tape recordings (VTRs) from various modeling and acting projects.">
+    
+    <link rel="icon" type="image/png" href="images/logo.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
@@ -53,6 +53,16 @@ try {
             border-color: #212529;
         }
         .swiper-slide.hidden-slide { display: none; }
+        .page-header {
+            background: url('images/cover.png') center center/cover no-repeat;
+            height: 400px;
+        }
+        @media (max-width: 768px) {
+            .page-header {
+                background: url('images/cover-mobile.png') center center/cover no-repeat;
+                height: 250px;
+            }
+        }
     </style>
 </head>
 
@@ -74,13 +84,10 @@ try {
             </h4>
         </div>
         
-        <!-- Filter Buttons (Now Dynamic) -->
         <div class="text-center my-4">
             <div class="btn-group flex-wrap justify-content-center">
-                <!-- 'All' button is hardcoded to show everything -->
                 <button class="filter-button btn btn-outline-dark me-2 active" data-filter="all">All</button>
                 
-                <!-- Dynamic buttons generated from the database -->
                 <?php foreach($categories as $cat): ?>
                     <button 
                         class="filter-button btn btn-outline-dark me-2" 
@@ -93,15 +100,20 @@ try {
         </div>
         
         <div class="container py-4 px-3 bg-white rounded-4 shadow-sm">
+            <?php if(empty($videos)): ?>
+                <div class="text-center py-5">
+                    <p class="text-muted">No videos available at the moment.</p>
+                </div>
+            <?php else: ?>
             <div class="swiper vtr-swiper">
                 <div class="swiper-wrapper">
                     <?php foreach($videos as $video): ?>
-                    <!-- The class is now set using the fetched category_short_name -->
                     <div class="swiper-slide item <?php echo h($video['category_short_name']); ?>">
                         <div class="ratio ratio-16x9">
                             <iframe src="<?php echo h($video['youtube_embed_url']); ?>" 
                                     title="<?php echo h($video['title']); ?>" 
-                                    allowfullscreen></iframe>
+                                    allowfullscreen
+                                    loading="lazy"></iframe>
                         </div>
                         <h5 class="mt-2 text-center"><?php echo h($video['title']); ?></h5>
                     </div>
@@ -112,20 +124,17 @@ try {
                 <div class="swiper-button-prev"></div>
                 <div class="swiper-pagination"></div>
             </div>
+            <?php endif; ?>
         </div>
     </section>
     
     <?php include 'footer.php'; ?>
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Since we are now using the short 'name' from the database as the filter key,
-        // this JavaScript logic should work automatically as long as the category names 
-        // match the data-filter attributes.
-        
         let mySwiper;
         const allSlides = document.querySelectorAll('.vtr-swiper .swiper-slide');
         
@@ -158,6 +167,7 @@ try {
                     el: '.swiper-pagination',
                     clickable: true,
                 },
+                lazy: true
             });
         }
         

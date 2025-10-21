@@ -1,0 +1,987 @@
+/* ============================================
+   MOBILE-FIRST RESPONSIVE ADDITIONS
+   Add this to your admin-styles.css
+   ============================================ */
+
+/* Card Layout for Mobile Devices */
+.mobile-card-layout {
+    display: none; /* Hidden by default on desktop */
+}
+
+.desktop-table-layout {
+    display: block; /* Shown by default */
+}
+
+/* Mobile Cards Styling */
+.item-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s ease;
+}
+
+.item-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.item-card.highlighted {
+    border-left: 4px solid var(--jade-primary);
+    background: linear-gradient(to right, rgba(205, 145, 158, 0.05), var(--card-bg));
+}
+
+.item-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    gap: 0.5rem;
+}
+
+.item-card-title {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin: 0;
+    flex: 1;
+}
+
+.item-card-badge {
+    flex-shrink: 0;
+}
+
+.item-card-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+}
+
+.item-card-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.item-card-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.item-card-meta-row i {
+    font-size: 0.9rem;
+    color: var(--jade-primary);
+    width: 20px;
+    flex-shrink: 0;
+}
+
+.item-card-meta-row strong {
+    color: var(--text-primary);
+    font-weight: 600;
+    min-width: 60px;
+}
+
+.item-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.item-card-actions .btn {
+    flex: 1;
+    min-width: calc(50% - 0.25rem);
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+}
+
+/* ============================================
+   RESPONSIVE BREAKPOINTS
+   ============================================ */
+
+/* Mobile Devices (< 768px) - SHOW CARDS, HIDE TABLE */
+@media (max-width: 767px) {
+    /* Hide desktop table on mobile */
+    .desktop-table-layout {
+        display: none !important;
+    }
+    
+    /* Show card layout on mobile */
+    .mobile-card-layout {
+        display: block !important;
+    }
+    
+    /* Adjust main content padding */
+    .main-content {
+        padding: 1rem 0.75rem !important;
+    }
+    
+    /* Make headers smaller */
+    .h2, h2 {
+        font-size: 1.5rem !important;
+    }
+    
+    /* Stack buttons in headers */
+    .d-flex.justify-content-between {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start !important;
+    }
+    
+    .d-flex.justify-content-between .btn {
+        width: 100%;
+    }
+    
+    /* Improve cards spacing */
+    .card {
+        margin-bottom: 1rem;
+        border-radius: 12px;
+    }
+    
+    /* Make form inputs larger for mobile */
+    .form-control, .form-select {
+        font-size: 16px !important; /* Prevents zoom on iOS */
+        padding: 0.75rem 1rem;
+    }
+    
+    /* Make buttons more touchable */
+    .btn {
+        padding: 0.75rem 1.25rem;
+        font-size: 1rem;
+    }
+    
+    .btn-sm {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    /* Improve modal sizing */
+    .modal-dialog {
+        margin: 0.5rem;
+        max-width: calc(100% - 1rem);
+    }
+    
+    /* Better alert visibility */
+    .alert {
+        font-size: 0.9rem;
+        padding: 0.75rem 1rem;
+    }
+    
+    /* Sidebar adjustments */
+    .sidebar {
+        position: relative;
+        width: 100% !important;
+        height: auto !important;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    /* Hide sidebar by default on mobile, show when toggled */
+    .sidebar.collapse:not(.show) {
+        display: none;
+    }
+    
+    /* Navbar adjustments */
+    .navbar-brand {
+        font-size: 1rem;
+    }
+    
+    .navbar-brand img {
+        height: 35px !important;
+    }
+    
+    /* Theme switcher - make smaller on mobile */
+    .theme-switcher {
+        gap: 6px;
+    }
+    
+    .theme-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+    
+    /* Badge adjustments */
+    .badge {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+}
+
+/* Small Mobile Devices (< 576px) */
+@media (max-width: 575px) {
+    /* Even more compact */
+    .main-content {
+        padding: 0.75rem 0.5rem !important;
+    }
+    
+    .card {
+        border-radius: 10px;
+    }
+    
+    .card-header {
+        padding: 1rem;
+        font-size: 0.95rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    /* Single column buttons */
+    .item-card-actions .btn {
+        min-width: 100%;
+    }
+    
+    /* Hide less important info on very small screens */
+    .hide-xs {
+        display: none !important;
+    }
+}
+
+/* Tablet Devices (768px - 991px) - SHOW TABLE */
+@media (min-width: 768px) and (max-width: 991px) {
+    /* Show desktop table */
+    .desktop-table-layout {
+        display: block !important;
+    }
+    
+    /* Hide mobile cards */
+    .mobile-card-layout {
+        display: none !important;
+    }
+    
+    /* Make table more compact */
+    .table {
+        font-size: 0.85rem;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.6rem 0.5rem !important;
+    }
+    
+    /* Smaller action buttons */
+    .table .btn-sm {
+        padding: 5px 8px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Desktop (≥ 992px) - SHOW TABLE */
+@media (min-width: 992px) {
+    /* Ensure desktop view */
+    .desktop-table-layout {
+        display: block !important;
+    }
+    
+    .mobile-card-layout {
+        display: none !important;
+    }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+    /* Hide mobile cards when printing */
+    .mobile-card-layout {
+        display: none !important;
+    }
+    
+    /* Show table for printing */
+    .desktop-table-layout {
+        display: block !important;
+    }
+    
+    /* Hide actions when printing */
+    .item-card-actions,
+    .action-buttons,
+    .btn {
+        display: none !important;
+    }
+}
+
+/* ============================================
+   ACCESSIBILITY IMPROVEMENTS
+   ============================================ */
+
+/* Better focus states for keyboard navigation */
+.btn:focus,
+.form-control:focus,
+.form-select:focus {
+    outline: 3px solid var(--jade-primary);
+    outline-offset: 2px;
+}
+
+/* Improve touch targets on mobile */
+@media (max-width: 767px) {
+    a, button, .btn, input, select, textarea {
+        min-height: 44px; /* Apple's recommended minimum touch target */
+    }
+}
+
+/* Better color contrast for accessibility */
+:root[data-theme="light"] {
+    --text-primary: #1a1a1a; /* Darker for better contrast */
+}
+
+:root[data-theme="dark"] {
+    --text-primary: #f5f5f5; /* Lighter for better contrast */
+}
+
+/* ============================================
+   LOADING STATES FOR MOBILE
+   ============================================ */
+
+.skeleton-loader {
+    background: linear-gradient(
+        90deg,
+        var(--bg-tertiary) 25%,
+        var(--bg-secondary) 50%,
+        var(--bg-tertiary) 75%
+    );
+    background-size: 200% 100%;
+    animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* ============================================
+   SWIPE GESTURE INDICATORS (Optional)
+   ============================================ */
+
+.swipeable {
+    position: relative;
+    overflow: hidden;
+}
+
+.swipeable::after {
+    content: '← Swipe';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--jade-primary);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px 0 0 4px;
+    font-size: 0.7rem;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* ============================================
+   DESKTOP-FITTED TABLE STYLES
+   Zero horizontal scrolling on desktop
+   Add this to admin-styles.css (REPLACE table sections)
+   ============================================ */
+
+/* ============================================
+   BASE TABLE STYLES - FITTED FOR DESKTOP
+   ============================================ */
+
+.table-responsive {
+    overflow-x: visible !important; /* Never scroll on desktop */
+    width: 100%;
+}
+
+.table {
+    width: 100% !important;
+    table-layout: fixed !important; /* Critical for fitting */
+    margin-bottom: 0;
+    font-size: 0.875rem;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Table Headers */
+.table thead th {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border-color) !important;
+    font-weight: 700 !important;
+    text-transform: uppercase;
+    font-size: 0.7rem !important;
+    letter-spacing: 0.5px;
+    padding: 0.75rem 0.5rem !important;
+    vertical-align: middle !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Table Cells */
+.table tbody td {
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    padding: 0.75rem 0.5rem !important;
+    vertical-align: middle !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.table-hover tbody tr:hover {
+    background-color: var(--table-hover) !important;
+}
+
+/* ============================================
+   INQUIRIES PAGE - SPECIFIC COLUMN WIDTHS
+   ============================================ */
+
+.inquiries-table th:nth-child(1),
+.inquiries-table td:nth-child(1) {
+    width: 5% !important; /* ID */
+    min-width: 40px;
+}
+
+.inquiries-table th:nth-child(2),
+.inquiries-table td:nth-child(2) {
+    width: 10% !important; /* Date */
+    min-width: 85px;
+}
+
+.inquiries-table th:nth-child(3),
+.inquiries-table td:nth-child(3) {
+    width: 15% !important; /* Name */
+    min-width: 100px;
+}
+
+.inquiries-table th:nth-child(4),
+.inquiries-table td:nth-child(4) {
+    width: 20% !important; /* Email */
+    min-width: 120px;
+    word-break: break-all;
+    font-size: 0.8rem;
+}
+
+.inquiries-table th:nth-child(5),
+.inquiries-table td:nth-child(5) {
+    width: 12% !important; /* Phone */
+    min-width: 90px;
+}
+
+.inquiries-table th:nth-child(6),
+.inquiries-table td:nth-child(6) {
+    width: 13% !important; /* Type */
+    min-width: 80px;
+}
+
+.inquiries-table th:nth-child(7),
+.inquiries-table td:nth-child(7) {
+    width: 8% !important; /* Status */
+    min-width: 60px;
+    text-align: center;
+}
+
+.inquiries-table th:nth-child(8),
+.inquiries-table td:nth-child(8) {
+    width: 17% !important; /* Actions */
+    min-width: 140px;
+    max-width: 140px;
+    text-align: right !important;
+    padding-right: 1rem !important;
+}
+
+/* ============================================
+   PARTNERS PAGE - SPECIFIC COLUMN WIDTHS
+   ============================================ */
+
+.partners-table th:nth-child(1),
+.partners-table td:nth-child(1) {
+    width: 10% !important; /* Order */
+    min-width: 70px;
+    text-align: center;
+}
+
+.partners-table th:nth-child(2),
+.partners-table td:nth-child(2) {
+    width: 15% !important; /* Logo */
+    min-width: 100px;
+    text-align: center;
+}
+
+.partners-table th:nth-child(3),
+.partners-table td:nth-child(3) {
+    width: 55% !important; /* Name */
+    min-width: 150px;
+}
+
+.partners-table th:nth-child(4),
+.partners-table td:nth-child(4) {
+    width: 20% !important; /* Actions */
+    min-width: 130px;
+    max-width: 130px;
+    text-align: right !important;
+    padding-right: 1rem !important;
+}
+
+/* ============================================
+   PORTRAITS PAGE - SPECIFIC COLUMN WIDTHS
+   ============================================ */
+
+.portraits-table th:nth-child(1),
+.portraits-table td:nth-child(1) {
+    width: 8% !important; /* Order */
+    min-width: 60px;
+    text-align: center;
+}
+
+.portraits-table th:nth-child(2),
+.portraits-table td:nth-child(2) {
+    width: 12% !important; /* Image */
+    min-width: 80px;
+}
+
+.portraits-table th:nth-child(3),
+.portraits-table td:nth-child(3) {
+    width: 25% !important; /* Title */
+    min-width: 120px;
+}
+
+.portraits-table th:nth-child(4),
+.portraits-table td:nth-child(4) {
+    width: 40% !important; /* Categories */
+    min-width: 150px;
+}
+
+.portraits-table th:nth-child(5),
+.portraits-table td:nth-child(5) {
+    width: 15% !important; /* Actions */
+    min-width: 120px;
+    max-width: 120px;
+    text-align: right !important;
+    padding-right: 1rem !important;
+}
+
+/* ============================================
+   VIDEOS PAGE - SPECIFIC COLUMN WIDTHS
+   ============================================ */
+
+.videos-table th:nth-child(1),
+.videos-table td:nth-child(1) {
+    width: 8% !important; /* Order */
+    min-width: 60px;
+    text-align: center;
+}
+
+.videos-table th:nth-child(2),
+.videos-table td:nth-child(2) {
+    width: 30% !important; /* Title */
+    min-width: 120px;
+}
+
+.videos-table th:nth-child(3),
+.videos-table td:nth-child(3) {
+    width: 15% !important; /* Category */
+    min-width: 100px;
+}
+
+.videos-table th:nth-child(4),
+.videos-table td:nth-child(4) {
+    width: 32% !important; /* URL */
+    min-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.videos-table th:nth-child(5),
+.videos-table td:nth-child(5) {
+    width: 15% !important; /* Actions */
+    min-width: 120px;
+    max-width: 120px;
+    text-align: right !important;
+    padding-right: 1rem !important;
+}
+
+/* ============================================
+   TESTIMONIALS PAGE - SPECIFIC COLUMN WIDTHS
+   ============================================ */
+
+.testimonials-table th:nth-child(1),
+.testimonials-table td:nth-child(1) {
+    width: 6% !important; /* ID */
+    min-width: 50px;
+    text-align: center;
+}
+
+.testimonials-table th:nth-child(2),
+.testimonials-table td:nth-child(2) {
+    width: 18% !important; /* Client Name */
+    min-width: 100px;
+}
+
+.testimonials-table th:nth-child(3),
+.testimonials-table td:nth-child(3) {
+    width: 18% !important; /* Client Title */
+    min-width: 100px;
+}
+
+.testimonials-table th:nth-child(4),
+.testimonials-table td:nth-child(4) {
+    width: 35% !important; /* Quote Preview */
+    min-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.testimonials-table th:nth-child(5),
+.testimonials-table td:nth-child(5) {
+    width: 10% !important; /* Status */
+    min-width: 80px;
+    text-align: center;
+}
+
+.testimonials-table th:nth-child(6),
+.testimonials-table td:nth-child(6) {
+    width: 13% !important; /* Actions */
+    min-width: 110px;
+    max-width: 110px;
+    text-align: right !important;
+    padding-right: 1rem !important;
+}
+
+/* ============================================
+   EXPERIENCES PAGE - SPECIFIC COLUMN WIDTHS
+   ============================================ */
+
+.experiences-table th:nth-child(1),
+.experiences-table td:nth-child(1) {
+    width: 8% !important; /* Order */
+    min-width: 60px;
+    text-align: center;
+}
+
+.experiences-table th:nth-child(2),
+.experiences-table td:nth-child(2) {
+    width: 20% !important; /* Category */
+    min-width: 120px;
+}
+
+.experiences-table th:nth-child(3),
+.experiences-table td:nth-child(3) {
+    width: 35% !important; /* Title */
+    min-width: 150px;
+}
+
+.experiences-table th:nth-child(4),
+.experiences-table td:nth-child(4) {
+    width: 20% !important; /* Date Range */
+    min-width: 100px;
+}
+
+.experiences-table th:nth-child(5),
+.experiences-table td:nth-child(5) {
+    width: 17% !important; /* Actions */
+    min-width: 130px;
+    max-width: 130px;
+    text-align: right !important;
+    padding-right: 1rem !important;
+}
+
+/* ============================================
+   ARCHIVES PAGE - DYNAMIC TABLE WIDTHS
+   ============================================ */
+
+.archives-table th:nth-child(1),
+.archives-table td:nth-child(1) {
+    width: 8% !important; /* ID/Order */
+    min-width: 60px;
+}
+
+.archives-table th:nth-child(2),
+.archives-table td:nth-child(2) {
+    width: 12% !important; /* Image/Logo (if present) */
+    min-width: 80px;
+}
+
+.archives-table th:nth-child(3),
+.archives-table td:nth-child(3) {
+    width: 40% !important; /* Name/Title */
+    min-width: 150px;
+}
+
+.archives-table th:nth-child(4),
+.archives-table td:nth-child(4) {
+    width: 20% !important; /* Archived Date */
+    min-width: 120px;
+}
+
+.archives-table th:nth-child(5),
+.archives-table td:nth-child(5) {
+    width: 20% !important; /* Actions */
+    min-width: 140px;
+    max-width: 140px;
+    text-align: center !important;
+}
+
+/* ============================================
+   ACTION BUTTONS - OPTIMIZED FOR SPACE
+   ============================================ */
+
+.action-buttons {
+    display: flex;
+    gap: 4px;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+}
+
+.table .btn-sm {
+    padding: 5px 8px !important;
+    font-size: 0.8rem !important;
+    white-space: nowrap;
+    border-radius: 6px;
+}
+
+/* Icon-only buttons for space efficiency */
+.table .btn-sm i {
+    margin: 0 !important;
+    font-size: 0.9rem;
+}
+
+/* Add text only on hover for desktop */
+.table .btn-sm .btn-text {
+    display: none;
+    margin-left: 4px;
+}
+
+.table .btn-sm:hover .btn-text {
+    display: inline;
+}
+
+/* ============================================
+   IMAGES IN TABLES - OPTIMIZED SIZING
+   ============================================ */
+
+.table img {
+    max-width: 50px !important;
+    max-height: 50px !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: cover;
+    border-radius: 6px;
+    display: block;
+    margin: 0 auto;
+}
+
+/* ============================================
+   BADGES - COMPACT SIZING
+   ============================================ */
+
+.table .badge {
+    font-size: 0.7rem !important;
+    padding: 3px 8px !important;
+    white-space: nowrap;
+    border-radius: 6px;
+}
+
+/* ============================================
+   TEXT TRUNCATION FOR LONG CONTENT
+   ============================================ */
+
+.table td.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0; /* Required for ellipsis to work */
+}
+
+/* Show full text on hover */
+.table td.truncate:hover {
+    overflow: visible;
+    white-space: normal;
+    word-break: break-word;
+    position: relative;
+    z-index: 10;
+    background: var(--card-bg);
+    box-shadow: var(--shadow-md);
+}
+
+/* ============================================
+   SMALL TEXT IN CELLS
+   ============================================ */
+
+.table td small,
+.table td .small {
+    font-size: 0.75rem !important;
+    display: block !important;
+    margin-top: 0.25rem !important;
+    color: var(--text-secondary) !important;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS FOR SMALLER DESKTOPS
+   ============================================ */
+
+/* Laptops (1024px - 1366px) */
+@media (min-width: 768px) and (max-width: 1366px) {
+    .table {
+        font-size: 0.8rem !important;
+    }
+    
+    .table thead th {
+        font-size: 0.65rem !important;
+        padding: 0.6rem 0.4rem !important;
+    }
+    
+    .table tbody td {
+        padding: 0.6rem 0.4rem !important;
+    }
+    
+    .table .btn-sm {
+        padding: 4px 6px !important;
+        font-size: 0.75rem !important;
+    }
+    
+    .table img {
+        max-width: 40px !important;
+        max-height: 40px !important;
+    }
+}
+
+/* Large Desktops (1920px+) */
+@media (min-width: 1920px) {
+    .table {
+        font-size: 0.95rem !important;
+    }
+    
+    .table thead th {
+        font-size: 0.8rem !important;
+        padding: 0.9rem 0.7rem !important;
+    }
+    
+    .table tbody td {
+        padding: 0.9rem 0.7rem !important;
+    }
+    
+    .table .btn-sm {
+        padding: 6px 10px !important;
+        font-size: 0.85rem !important;
+    }
+    
+    .table img {
+        max-width: 70px !important;
+        max-height: 70px !important;
+    }
+}
+
+/* ============================================
+   DARK MODE TABLE IMPROVEMENTS
+   ============================================ */
+
+:root[data-theme="dark"] .table {
+    --bs-table-bg: var(--card-bg) !important;
+}
+
+:root[data-theme="dark"] .table thead th {
+    background-color: var(--bg-tertiary) !important;
+    color: var(--text-primary) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+:root[data-theme="dark"] .table tbody td {
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+:root[data-theme="dark"] .table-hover tbody tr:hover {
+    background-color: var(--table-hover) !important;
+}
+
+/* ============================================
+   UTILITIES
+   ============================================ */
+
+/* Center align content */
+.table .text-center {
+    text-align: center !important;
+}
+
+/* Right align content */
+.table .text-end {
+    text-align: right !important;
+}
+
+/* Prevent text wrapping */
+.table .text-nowrap {
+    white-space: nowrap !important;
+}
+
+/* Allow text wrapping */
+.table .text-wrap {
+    white-space: normal !important;
+    word-break: break-word !important;
+}
+
+/* ============================================
+   LOADING STATE
+   ============================================ */
+
+.table-loading {
+    position: relative;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.table-loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    margin: -20px 0 0 -20px;
+    border: 4px solid var(--jade-primary);
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   EMPTY STATE IN TABLES
+   ============================================ */
+
+.table-empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+}
+
+.table-empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.table-empty-state h4 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.table-empty-state p {
+    font-size: 0.9rem;
+    margin: 0;
+}

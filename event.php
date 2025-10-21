@@ -1,15 +1,10 @@
 <?php
-// The custom function h() definition has been removed from this file 
-// to resolve the "Cannot redeclare h()" error, as it appears to be defined
-// unconditionally in config.php (or another included file).
-
 require_once 'config.php';
 
 try {
     $conn = getDBConnection();
     
     // Fetch event portraits - ONLY filter by categories containing 'events' or 'ritemed'
-    // This ensures this page is dedicated only to those specific event types.
     $stmt = $conn->prepare("
         SELECT * FROM portraits 
         WHERE categories LIKE '%events%' OR categories LIKE '%ritemed%'
@@ -30,6 +25,7 @@ try {
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="View Jade Salvador's event photography and modeling work including general events and RiteMed collaborations.">
     
     <link rel="icon" type="image/png" href="images/logo.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -57,9 +53,8 @@ try {
             background: url('images/cover.png') center center/cover no-repeat;
             height: 400px;
         }
-        /* Style for the image container to maintain aspect ratio and fit within the card */
         .card-img-container {
-            height: 300px; /* Fixed height for consistency */
+            height: 300px;
             overflow: hidden;
             display: flex;
             justify-content: center;
@@ -68,7 +63,7 @@ try {
         .card-img-container img {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Ensures the image covers the container without distortion */
+            object-fit: cover;
             transition: transform 0.3s ease;
         }
         .card:hover .card-img-container img {
@@ -81,12 +76,6 @@ try {
         }
         .card-body {
             padding: 1.5rem 1rem;
-        }
-        .portrait-scrollbox {
-            /* If you want the grid to be scrollable within a fixed height: */
-            /* max-height: 80vh; */
-            /* overflow-y: auto; */
-            /* padding: 10px; */
         }
         @media (max-width: 768px) {
             .page-header {
@@ -121,7 +110,6 @@ try {
                 </div>
             </div>
             
-            <!-- Scrollable grid wrapper -->
             <div class="portrait-scrollbox">
                 <div class="isotope-container row g-4">
                     <?php if(empty($event_portraits)): ?>
@@ -131,25 +119,19 @@ try {
                     <?php else: ?>
                         <?php foreach($event_portraits as $portrait): ?>
                         <?php 
-                        // **FINAL FIX:** Explicitly check for 'events' and 'ritemed' to generate the required CSS classes.
-                        // This bypasses any issues with spaces, commas, or casing in the raw database string.
                         $category_classes = '';
                         $categories_lower = strtolower($portrait['categories'] ?? '');
 
-                        // If the category string contains 'events' (or 'general events'), assign the 'events' class
                         if (str_contains($categories_lower, 'events')) {
                             $category_classes .= ' events';
                         }
 
-                        // If the category string contains 'ritemed', assign the 'ritemed' class
                         if (str_contains($categories_lower, 'ritemed')) {
                             $category_classes .= ' ritemed';
                         }
                         
-                        // Trim leading/trailing whitespace
                         $category_classes = trim($category_classes);
                         ?>
-                        <!-- The generated 'category_classes' are now guaranteed to be 'events' or 'ritemed' (or both) -->
                         <div class="item <?php echo h($category_classes); ?> col-12 col-sm-6 col-md-4">
                             <div class="card border-0 shadow-lg rounded-3">
                                 <a href="#" data-bs-toggle="modal" data-bs-target="#imageModal" 
@@ -158,7 +140,8 @@ try {
                                     <div class="card-img-container">
                                         <img src="<?php echo h($portrait['image_filename']); ?>" 
                                              alt="<?php echo h($portrait['title']); ?>" 
-                                             class="img-fluid">
+                                             class="img-fluid"
+                                             loading="lazy">
                                     </div>
                                     <div class="card-body text-center">
                                         <h5 class="card-title text-dark fw-bold" style="font-family: 'Playfair Display', serif;"><?php echo h($portrait['title']); ?></h5>
@@ -186,18 +169,25 @@ try {
     
     <?php include 'footer.php'; ?>
     
-    <!-- Dependencies (using Bootstrap 5.3.3 and latest jQuery) -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawR/U9z9KkLp/hS" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" xintegrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <!-- FIXED: Corrected jQuery integrity hash -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcUj0MY7/DQUdKkdGQ7BKJJhp8lreDQo4=" crossorigin="anonymous"></script>
+    <!-- FIXED: Changed xintegrity to integrity -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"></script>
     <script src="https://unpkg.com/isotope-layout@3/dist/isotope.pkgd.min.js"></script>
+    <!-- ImagesLoaded for proper Isotope layout -->
+    <script src="https://unpkg.com/imagesloaded@5/imagesloaded.pkgd.min.js"></script>
     
     <script>
     $(document).ready(function() {
-        // Initialize Isotope
-        var $grid = $('.isotope-container').isotope({
-            itemSelector: '.item',
-            layoutMode: 'fitRows'
+        var $grid = $('.isotope-container');
+        
+        // Wait for images to load before initializing Isotope
+        $grid.imagesLoaded(function() {
+            $grid.isotope({
+                itemSelector: '.item',
+                layoutMode: 'fitRows'
+            });
         });
         
         // Filter functionality
@@ -205,7 +195,6 @@ try {
             var filterValue = $(this).attr('data-filter');
             $grid.isotope({ filter: filterValue });
             
-            // Handle active state for buttons
             $('.filter-button').removeClass('active btn-dark').addClass('btn-outline-dark');
             $(this).addClass('active btn-dark').removeClass('btn-outline-dark');
         });
@@ -221,12 +210,6 @@ try {
             
             modalImage.src = src;
             modalImage.alt = alt;
-        });
-
-        // Ensure Isotope reflows after images load to prevent overlap
-        // This is important for correct layout when images load asynchronously
-        $grid.imagesLoaded().progress( function() {
-            $grid.isotope('layout');
         });
     });
     </script>
