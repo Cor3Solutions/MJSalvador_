@@ -11,12 +11,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 // Validate and sanitize inputs
 $opportunity_id = isset($_POST['opportunity_id']) ? (int)$_POST['opportunity_id'] : 0;
+$job_type = isset($_POST['job_type']) ? trim($_POST['job_type']) : '';
 $full_name = isset($_POST['full_name']) ? trim($_POST['full_name']) : '';
 $email = isset($_POST['email']) ? trim($_POST['email']) : '';
 $phone_number = isset($_POST['phone_number']) ? trim($_POST['phone_number']) : '';
+$setcard_link = isset($_POST['setcard_link']) ? trim($_POST['setcard_link']) : '';
+$vtr_link = isset($_POST['vtr_link']) ? trim($_POST['vtr_link']) : '';
+$resume_cv_link = isset($_POST['resume_cv_link']) ? trim($_POST['resume_cv_link']) : '';
 $portfolio_link = isset($_POST['portfolio_link']) ? trim($_POST['portfolio_link']) : '';
-$cover_letter = isset($_POST['cover_letter']) ? trim($_POST['cover_letter']) : '';
-$experience_years = isset($_POST['experience_years']) ? (int)$_POST['experience_years'] : 0;
 
 // Validation
 $errors = [];
@@ -33,8 +35,17 @@ if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $errors[] = 'Valid email is required';
 }
 
-if (empty($cover_letter)) {
-    $errors[] = 'Please tell us why you\'re interested';
+if (empty($phone_number)) {
+    $errors[] = 'Phone number is required';
+}
+
+// Job type specific validation
+if ($job_type === 'talent' && empty($setcard_link)) {
+    $errors[] = 'Set card link is required for talent applications';
+}
+
+if ($job_type === 'virtual-assistant' && empty($resume_cv_link)) {
+    $errors[] = 'Resume/CV link is required for virtual assistant applications';
 }
 
 if (!empty($errors)) {
@@ -59,18 +70,20 @@ try {
     
     // Insert application
     $stmt = $conn->prepare("
-        INSERT INTO applications (opportunity_id, full_name, email, phone_number, portfolio_link, cover_letter, experience_years, submission_date, is_reviewed, status)
-        VALUES (:opp_id, :name, :email, :phone, :portfolio, :cover, :exp, NOW(), 0, 'pending')
+        INSERT INTO applications (opportunity_id, job_type, full_name, email, phone_number, setcard_link, vtr_link, resume_cv_link, portfolio_link, submission_date, is_reviewed, status)
+        VALUES (:opp_id, :job_type, :name, :email, :phone, :setcard, :vtr, :resume, :portfolio, NOW(), 0, 'pending')
     ");
     
     $stmt->execute([
         ':opp_id' => $opportunity_id,
+        ':job_type' => $job_type,
         ':name' => $full_name,
         ':email' => $email,
         ':phone' => $phone_number,
-        ':portfolio' => $portfolio_link,
-        ':cover' => $cover_letter,
-        ':exp' => $experience_years
+        ':setcard' => $setcard_link,
+        ':vtr' => $vtr_link,
+        ':resume' => $resume_cv_link,
+        ':portfolio' => $portfolio_link
     ]);
     
     // Send email notification to admin
@@ -78,14 +91,28 @@ try {
     $subject = "New Application: " . $opportunity['title'];
     $email_message = "New application received:\n\n";
     $email_message .= "Position: " . $opportunity['title'] . "\n";
+    $email_message .= "Job Type: " . $job_type . "\n\n";
     $email_message .= "Name: " . $full_name . "\n";
     $email_message .= "Email: " . $email . "\n";
-    $email_message .= "Phone: " . $phone_number . "\n";
-    $email_message .= "Experience: " . $experience_years . " years\n";
-    $email_message .= "Portfolio: " . $portfolio_link . "\n\n";
-    $email_message .= "Message:\n" . $cover_letter;
+    $email_message .= "Phone: " . $phone_number . "\n\n";
     
-    $headers = "From: noreply@jadesalvador.com\r\n";
+    if ($job_type === 'talent' && !empty($setcard_link)) {
+        $email_message .= "Set Card: " . $setcard_link . "\n";
+        if (!empty($vtr_link)) {
+            $email_message .= "VTR/Demo Reel: " . $vtr_link . "\n";
+        }
+    }
+    
+    if ($job_type === 'virtual-assistant') {
+        if (!empty($resume_cv_link)) {
+            $email_message .= "Resume/CV: " . $resume_cv_link . "\n";
+        }
+        if (!empty($portfolio_link)) {
+            $email_message .= "Portfolio: " . $portfolio_link . "\n";
+        }
+    }
+    
+    $headers = "From: mareljadesalvador@gmail.com\r\n";
     $headers .= "Reply-To: " . $email . "\r\n";
     
     @mail($to, $subject, $email_message, $headers);
