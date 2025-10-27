@@ -512,10 +512,19 @@ function formatFileSize($bytes) {
                                         $file_ext = strtolower(pathinfo($current_resume['filepath'], PATHINFO_EXTENSION));
                                         ?>
                                         <?php if ($file_exists): ?>
-                                            <iframe src="https://docs.google.com/gview?url=<?php echo urlencode($viewer_url); ?>&embedded=true" 
-                                                    style="width:100%; height:100%;" 
-                                                    frameborder="0">
-                                            </iframe>
+                                            <?php if ($file_ext === 'pdf'): ?>
+                                                <iframe src="<?php echo $viewer_url; ?>" 
+                                                        style="width:100%; height:100%;" 
+                                                        frameborder="0"
+                                                        type="application/pdf">
+                                                </iframe>
+                                            <?php else: ?>
+                                                <!-- For non-PDF files, use Google Docs viewer as fallback -->
+                                                <iframe src="https://docs.google.com/gview?url=<?php echo urlencode($viewer_url); ?>&embedded=true" 
+                                                        style="width:100%; height:100%;" 
+                                                        frameborder="0">
+                                                </iframe>
+                                            <?php endif; ?>
                                         <?php else: ?>
                                             <div class="d-flex flex-column justify-content-center align-items-center h-100 text-muted p-4">
                                                 <i class="bi bi-exclamation-triangle display-1 text-warning"></i>

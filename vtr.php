@@ -7,6 +7,33 @@ if (!function_exists('h')) {
     }
 }
 
+// Function to convert YouTube URL to embed format
+function convertToEmbedUrl($url) {
+    // Extract video ID from various YouTube URL formats
+    $video_id = '';
+    
+    // Handle youtu.be format: https://youtu.be/VIDEO_ID
+    if (preg_match('/youtu\.be\/([a-zA-Z0-9_-]+)/', $url, $matches)) {
+        $video_id = $matches[1];
+    }
+    // Handle youtube.com/watch format: https://www.youtube.com/watch?v=VIDEO_ID
+    elseif (preg_match('/youtube\.com\/watch\?v=([a-zA-Z0-9_-]+)/', $url, $matches)) {
+        $video_id = $matches[1];
+    }
+    // Handle youtube.com/embed format: https://www.youtube.com/embed/VIDEO_ID
+    elseif (preg_match('/youtube\.com\/embed\/([a-zA-Z0-9_-]+)/', $url, $matches)) {
+        $video_id = $matches[1];
+    }
+    
+    // Return embed URL if video ID found
+    if ($video_id) {
+        return "https://www.youtube.com/embed/{$video_id}";
+    }
+    
+    // Return original URL if no video ID found
+    return $url;
+}
+
 try {
     $conn = getDBConnection();
     
@@ -63,6 +90,24 @@ try {
                 height: 250px;
             }
         }
+        
+        .swiper-slide {
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        
+        .swiper-slide .ratio {
+            width: 100% !important;
+        }
+        
+        .swiper-slide h5 {
+            width: 100% !important;
+            margin-top: 1rem !important;
+        }
+        
+        .swiper-slide[style*="display: none"] {
+            display: none !important;
+        }
     </style>
 </head>
 
@@ -86,16 +131,16 @@ try {
         
         <div class="text-center my-4">
             <div class="btn-group flex-wrap justify-content-center">
-                <button class="filter-button btn btn-outline-dark me-2 active" data-filter="all">All</button>
-                
-                <?php foreach($categories as $cat): ?>
-                    <button 
-                        class="filter-button btn btn-outline-dark me-2" 
-                        data-filter="<?php echo h($cat['name']); ?>"
-                    >
-                        <?php echo h($cat['display_name']); ?>
-                    </button>
-                <?php endforeach; ?>
+                <?php if (!empty($categories)): ?>
+                    <?php foreach($categories as $index => $cat): ?>
+                        <button 
+                            class="filter-button btn btn-outline-dark me-2 <?php echo $index === 0 ? 'active' : ''; ?>" 
+                            data-filter="<?php echo h($cat['name']); ?>"
+                        >
+                            <?php echo h($cat['display_name']); ?>
+                        </button>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -110,12 +155,12 @@ try {
                     <?php foreach($videos as $video): ?>
                     <div class="swiper-slide item <?php echo h($video['category_short_name']); ?>">
                         <div class="ratio ratio-16x9">
-                            <iframe src="<?php echo h($video['youtube_embed_url']); ?>" 
+                            <iframe src="<?php echo h(convertToEmbedUrl($video['youtube_embed_url'])); ?>" 
                                     title="<?php echo h($video['title']); ?>" 
                                     allowfullscreen
                                     loading="lazy"></iframe>
                         </div>
-                        <h5 class="mt-2 text-center"><?php echo h($video['title']); ?></h5>
+                        <h5 class="mt-4 text-center"><?php echo h($video['title']); ?></h5>
                     </div>
                     <?php endforeach; ?>
                 </div>
@@ -143,13 +188,22 @@ try {
                 mySwiper.destroy(true, true);
             }
             
+            console.log('Filtering by:', filter);
+            let visibleCount = 0;
+            
             allSlides.forEach(slide => {
-                if (filter === 'all' || slide.classList.contains(filter)) {
+                const hasClass = slide.classList.contains(filter);
+                console.log('Slide classes:', slide.className, 'Has filter class:', hasClass);
+                
+                if (hasClass) {
                     slide.style.display = '';
+                    visibleCount++;
                 } else {
                     slide.style.display = 'none';
                 }
             });
+            
+            console.log('Visible slides:', visibleCount);
             
             mySwiper = new Swiper('.vtr-swiper', {
                 slidesPerView: 1,
@@ -172,16 +226,22 @@ try {
         }
         
         const buttons = document.querySelectorAll('.filter-button');
+        console.log('Found filter buttons:', buttons.length);
         buttons.forEach(btn => {
+            console.log('Button:', btn.textContent, 'Filter:', btn.dataset.filter);
             btn.addEventListener('click', () => {
                 const filter = btn.dataset.filter;
+                console.log('Clicked filter:', filter);
                 buttons.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 initSwiper(filter);
             });
         });
         
-        initSwiper('all');
+        // Initialize with the first category
+        const firstButton = document.querySelector('.filter-button.active');
+        const firstFilter = firstButton ? firstButton.dataset.filter : '';
+        initSwiper(firstFilter);
     });
     </script>
 </body>

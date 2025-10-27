@@ -234,6 +234,55 @@ $has_testimonials = !empty($testimonials);
       color: white;
     }
 
+    /* CV SWIPER STYLES */
+    .cv-swiper {
+      padding-bottom: 40px;
+      margin: 0;
+    }
+
+    .cv-swiper .swiper-wrapper {
+      align-items: stretch;
+    }
+
+    .cv-swiper .swiper-slide {
+      height: auto;
+      display: flex;
+      align-items: stretch;
+    }
+
+    .cv-swiper .card {
+      width: 100%;
+      margin: 0;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cv-swiper .card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .cv-swiper .swiper-pagination {
+      bottom: 10px;
+    }
+
+    .cv-swiper .swiper-pagination-bullet {
+      width: 10px;
+      height: 10px;
+      opacity: 1;
+      background: #d1d5db;
+      transition: background-color 0.3s;
+    }
+
+    .cv-swiper .swiper-pagination-bullet-active {
+      background: #cd919e;
+      width: 12px;
+      height: 12px;
+    }
+
     /* MODALS */
     .modal-content {
       background-color: #fff !important;
@@ -958,7 +1007,8 @@ $has_testimonials = !empty($testimonials);
     </div>
 
     <?php if (!empty($featured_cvs)): ?>
-      <div class="row justify-content-center g-4">
+      <!-- Desktop Layout -->
+      <div class="row justify-content-center g-4 d-none d-md-flex">
         <?php foreach ($featured_cvs as $cv): ?>
           <div class="col-md-6 col-lg-5">
             <div class="card shadow-sm h-100 cv-card">
@@ -995,6 +1045,49 @@ $has_testimonials = !empty($testimonials);
             </div>
           </div>
         <?php endforeach; ?>
+      </div>
+
+      <!-- Mobile Swiper Layout -->
+      <div class="swiper cv-swiper d-md-none">
+        <div class="swiper-wrapper">
+          <?php foreach ($featured_cvs as $cv): ?>
+            <div class="swiper-slide">
+              <div class="card shadow-sm h-100 cv-card">
+                <div class="card-body text-center p-4">
+                  <div class="cv-icon mb-3">
+                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                  </div>
+
+                  <h4 class="card-title mb-3"><?php echo h($cv['cv_type'] ?? 'Professional CV'); ?></h4>
+
+                  <p class="text-muted small mb-4">
+                    <i class="bi bi-calendar3 me-1"></i>
+                    Updated <?php echo date('M Y', strtotime($cv['upload_date'])); ?>
+                    <?php if ($cv['has_password']): ?>
+                      <br><i class="bi bi-lock-fill me-1"></i>
+                      <span class="text-warning">Password Protected</span>
+                    <?php endif; ?>
+                  </p>
+
+                  <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary preview-cv" data-cv-path="<?php echo h($cv['filepath']); ?>"
+                      data-cv-title="<?php echo h($cv['cv_type'] ?? 'CV'); ?>">
+                      <i class="bi bi-eye me-2"></i>Preview
+                    </button>
+                    <button class="btn btn-primary download-cv" data-cv-id="<?php echo $cv['resume_id']; ?>"
+                      data-has-password="<?php echo $cv['has_password']; ?>">
+                      <i class="bi bi-download me-2"></i>Download
+                      <?php if ($cv['has_password']): ?>
+                        <i class="bi bi-lock-fill ms-1"></i>
+                      <?php endif; ?>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+        <div class="swiper-pagination"></div>
       </div>
 
       <div class="text-center mt-4">
@@ -1610,45 +1703,214 @@ $has_testimonials = !empty($testimonials);
       const previewModal = new bootstrap.Modal(document.getElementById('cvPreviewModal'));
       const passwordModal = new bootstrap.Modal(document.getElementById('cvPasswordModal'));
 
-      // Preview CV
-      document.querySelectorAll('.preview-cv').forEach(btn => {
-        btn.addEventListener('click', function () {
-          const path = this.dataset.cvPath;
-          const title = this.dataset.cvTitle;
-          const url = window.location.origin + '/' + path;
-          const fileExt = path.split('.').pop().toLowerCase();
-
-          document.getElementById('previewTitle').textContent = title;
-
-          if (fileExt === 'pdf') {
-            document.getElementById('previewContainer').innerHTML = `<embed src="${url}" type="application/pdf" width="100%" height="100%">`;
-          } else if (fileExt === 'doc' || fileExt === 'docx') {
-            document.getElementById('previewContainer').innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}" style="width:100%; height:100%; border:none;"></iframe>`;
-          } else {
-            document.getElementById('previewContainer').innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>`;
-          }
-
-          previewModal.show();
+      // Preview CV - Works for both desktop and mobile swiper
+      function attachPreviewListeners() {
+        document.querySelectorAll('.preview-cv').forEach(btn => {
+          // Remove existing listeners to prevent duplicates
+          btn.replaceWith(btn.cloneNode(true));
         });
-      });
+        
+        document.querySelectorAll('.preview-cv').forEach(btn => {
+          btn.addEventListener('click', function () {
+            const path = this.dataset.cvPath;
+            const title = this.dataset.cvTitle;
+            
+            // Construct proper URL for XAMPP/localhost setup
+            let url;
+            if (path.startsWith('http')) {
+              // Already a full URL
+              url = path;
+            } else {
+              // For XAMPP, construct URL relative to the project root
+              const currentPath = window.location.pathname;
+              const projectRoot = currentPath.substring(0, currentPath.lastIndexOf('/'));
+              url = window.location.origin + projectRoot + '/' + path;
+            }
+            
+            const fileExt = path.split('.').pop().toLowerCase();
+            
+            // Debug: Log the constructed URL
+            console.log('CV Preview Debug:', {
+              originalPath: path,
+              constructedUrl: url,
+              fileExtension: fileExt
+            });
 
-      // Download CV
-      document.querySelectorAll('.download-cv').forEach(btn => {
-        btn.addEventListener('click', function () {
-          const cvId = this.dataset.cvId;
-          const hasPassword = this.dataset.hasPassword == '1';
+            document.getElementById('previewTitle').textContent = title;
+            
+            // Test if file is accessible before showing preview
+            fetch(url, { method: 'HEAD' })
+              .then(response => {
+                if (!response.ok) {
+                  throw new Error(`File not accessible: ${response.status}`);
+                }
+                showPreview();
+              })
+              .catch(error => {
+                console.error('File access error:', error);
+                showErrorFallback();
+              });
+            
+            function showPreview() {
+              // Show loading state
+              document.getElementById('previewContainer').innerHTML = `
+                <div class="d-flex justify-content-center align-items-center h-100">
+                  <div class="text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="text-muted">Loading CV preview...</p>
+                  </div>
+                </div>
+              `;
 
-          if (hasPassword) {
-            document.getElementById('passwordCvId').value = cvId;
-            document.getElementById('cvPasswordInput').value = '';
-            document.getElementById('cvPasswordInput').classList.remove('is-invalid');
-            document.getElementById('pwdError').classList.add('d-none');
-            passwordModal.show();
-          } else {
-            window.location.href = `download_cv.php?id=${cvId}`;
-          }
+              if (fileExt === 'pdf') {
+              // Create PDF viewer with fallback options
+              const pdfViewer = `
+                <div class="h-100 position-relative">
+                  <embed id="pdfEmbed" 
+                         src="${url}#toolbar=1&navpanes=1&scrollbar=1&view=FitH" 
+                         type="application/pdf" 
+                         width="100%" 
+                         height="100%"
+                         onerror="showPdfFallback('${url}')"
+                         onload="hideLoading()">
+                  <div id="pdfFallback" class="d-none h-100 d-flex flex-column justify-content-center align-items-center">
+                    <div class="alert alert-warning mb-3">
+                      <i class="bi bi-exclamation-triangle me-2"></i>
+                      PDF preview not supported in this browser
+                    </div>
+                    <div class="d-grid gap-2">
+                      <a href="${url}" target="_blank" class="btn btn-primary">
+                        <i class="bi bi-box-arrow-up-right me-2"></i>Open PDF in New Tab
+                      </a>
+                      <a href="${url}" download class="btn btn-outline-primary">
+                        <i class="bi bi-download me-2"></i>Download PDF
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              `;
+              document.getElementById('previewContainer').innerHTML = pdfViewer;
+              
+              // Set a timeout to show fallback if PDF doesn't load within 5 seconds
+              setTimeout(() => {
+                const embed = document.getElementById('pdfEmbed');
+                if (embed && !embed.complete) {
+                  showPdfFallback(url);
+                }
+              }, 5000);
+            } else if (fileExt === 'doc' || fileExt === 'docx') {
+              document.getElementById('previewContainer').innerHTML = `
+                <div class="h-100 d-flex flex-column justify-content-center align-items-center">
+                  <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Word documents cannot be previewed directly in the browser
+                  </div>
+                  <div class="d-grid gap-2">
+                    <a href="${url}" download class="btn btn-primary">
+                      <i class="bi bi-download me-2"></i>Download Document
+                    </a>
+                  </div>
+                </div>
+              `;
+            } else {
+              document.getElementById('previewContainer').innerHTML = `
+                <div class="h-100 d-flex flex-column justify-content-center align-items-center">
+                  <div class="alert alert-warning mb-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    File type not supported for preview
+                  </div>
+                  <div class="d-grid gap-2">
+                    <a href="${url}" download class="btn btn-primary">
+                      <i class="bi bi-download me-2"></i>Download File
+                    </a>
+                  </div>
+                </div>
+              `;
+            }
+
+            previewModal.show();
+            }
+            
+            function showErrorFallback() {
+              document.getElementById('previewContainer').innerHTML = `
+                <div class="h-100 d-flex flex-column justify-content-center align-items-center">
+                  <div class="alert alert-danger mb-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    File not found or not accessible
+                  </div>
+                  <div class="text-muted mb-3">
+                    <small>Debug info: ${url}</small>
+                  </div>
+                  <div class="d-grid gap-2">
+                    <button class="btn btn-primary" onclick="window.open('${url}', '_blank')">
+                      <i class="bi bi-box-arrow-up-right me-2"></i>Try Opening in New Tab
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="document.getElementById('cvPreviewModal').querySelector('.btn-close').click()">
+                      <i class="bi bi-x-circle me-2"></i>Close
+                    </button>
+                  </div>
+                </div>
+              `;
+              previewModal.show();
+            }
+          });
         });
-      });
+      }
+
+      // Attach listeners initially
+      attachPreviewListeners();
+
+      // Helper functions for PDF preview
+      window.showPdfFallback = function(url) {
+        const fallback = document.getElementById('pdfFallback');
+        if (fallback) {
+          fallback.classList.remove('d-none');
+          fallback.classList.add('d-flex');
+          // Hide the embed element
+          const embed = document.getElementById('pdfEmbed');
+          if (embed) {
+            embed.style.display = 'none';
+          }
+        }
+        hideLoading();
+      };
+
+      window.hideLoading = function() {
+        const loadingElement = document.querySelector('.spinner-border');
+        if (loadingElement) {
+          loadingElement.parentElement.parentElement.remove();
+        }
+      };
+
+      // Download CV - Works for both desktop and mobile swiper
+      function attachDownloadListeners() {
+        document.querySelectorAll('.download-cv').forEach(btn => {
+          // Remove existing listeners to prevent duplicates
+          btn.replaceWith(btn.cloneNode(true));
+        });
+        
+        document.querySelectorAll('.download-cv').forEach(btn => {
+          btn.addEventListener('click', function () {
+            const cvId = this.dataset.cvId;
+            const hasPassword = this.dataset.hasPassword == '1';
+
+            if (hasPassword) {
+              document.getElementById('passwordCvId').value = cvId;
+              document.getElementById('cvPasswordInput').value = '';
+              document.getElementById('cvPasswordInput').classList.remove('is-invalid');
+              document.getElementById('pwdError').classList.add('d-none');
+              passwordModal.show();
+            } else {
+              window.location.href = `download_cv.php?id=${cvId}`;
+            }
+          });
+        });
+      }
+
+      // Attach download listeners initially
+      attachDownloadListeners();
 
       // Password form submit
       document.getElementById('cvPasswordForm').addEventListener('submit', async function (e) {
@@ -1801,6 +2063,33 @@ $has_testimonials = !empty($testimonials);
         0: { slidesPerView: 1, spaceBetween: 20 },
         768: { slidesPerView: 2, spaceBetween: 30 },
         992: { slidesPerView: 3, spaceBetween: 40 }
+      }
+    });
+
+    // CV Swiper (Mobile Only)
+    const cvSwiper = new Swiper(".cv-swiper", {
+      direction: 'horizontal',
+      loop: false,
+      slidesPerView: 1,
+      spaceBetween: 0,
+      autoHeight: false,
+      centeredSlides: true,
+      pagination: {
+        el: '.swiper-pagination',
+        clickable: true,
+      },
+      breakpoints: {
+        0: { slidesPerView: 1, spaceBetween: 0 },
+        768: { slidesPerView: 1, spaceBetween: 0 }
+      },
+      on: {
+        init: function() {
+          // Ensure all slides have same height
+          this.updateAutoHeight();
+        },
+        slideChange: function() {
+          this.updateAutoHeight();
+        }
       }
     });
     // OPPORTUNITIES TOGGLE DETAILS
