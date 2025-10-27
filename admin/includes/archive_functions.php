@@ -1,13 +1,35 @@
 <?php
 /**
  * Archive System Helper Functions
- * Add these functions to your config.php or create a new file: admin/includes/archive_functions.php
+ * Filename: admin/includes/archive_functions.php
  */
+
+// --- DEPENDENCY: DATABASE CONNECTION ---
+// Assuming config.php defines DB_HOST, DB_NAME, DB_USER, DB_PASS
+if (!function_exists('getDBConnection')) {
+    function getDBConnection() {
+        try {
+            $conn = new PDO(
+                "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8",
+                DB_USER,
+                DB_PASS
+            );
+            $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+            return $conn;
+        } catch (PDOException $e) {
+            error_log("Database Connection Error: " . $e->getMessage());
+            // It is critical to throw an exception if the connection fails
+            throw new Exception("Database connection failed."); 
+        }
+    }
+}
+// --- END DEPENDENCY ---
+
 
 /**
  * Archive a record (soft delete)
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name
  * @param string $id_column Primary key column name
  * @param int $id Record ID to archive
@@ -48,8 +70,7 @@ function archiveRecord($conn, $table, $id_column, $id, $user_id = null) {
 
 /**
  * Restore an archived record
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name
  * @param string $id_column Primary key column name
  * @param int $id Record ID to restore
@@ -87,8 +108,7 @@ function restoreRecord($conn, $table, $id_column, $id, $user_id = null) {
 
 /**
  * Permanently delete a record
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name
  * @param string $id_column Primary key column name
  * @param int $id Record ID to delete
@@ -121,8 +141,7 @@ function permanentlyDeleteRecord($conn, $table, $id_column, $id, $user_id = null
 
 /**
  * Log archive action to archive_logs table
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name
  * @param int $record_id Record ID
  * @param string $action Action performed (archived, restored, permanently_deleted)
@@ -149,8 +168,7 @@ function logArchiveAction($conn, $table, $record_id, $action, $user_id = null, $
 
 /**
  * Get archived items count
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name (optional, null for all tables)
  * @return int|array Count or array of counts per table
  */
@@ -161,20 +179,21 @@ function getArchivedCount($conn, $table = null) {
             $stmt = $conn->query($sql);
             return (int) $stmt->fetch()['count'];
         } else {
-            // Get counts for all tables
+            // Get counts for all tables (assuming archived_items_summary is a VIEW or a summary table)
+            // If this view does not exist, this function will fail when $table is null.
             $stmt = $conn->query("SELECT * FROM archived_items_summary");
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     } catch (PDOException $e) {
-        error_log("Get archived count error: " . $e->getMessage());
+        // If the query fails (e.g., table doesn't exist), return 0
+        error_log("Get archived count error for table {$table}: " . $e->getMessage());
         return $table ? 0 : [];
     }
 }
 
 /**
  * Get archived items from a table
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name
  * @param int $limit Limit results (optional)
  * @param int $offset Offset for pagination (optional)
@@ -195,15 +214,14 @@ function getArchivedItems($conn, $table, $limit = 50, $offset = 0) {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
         
     } catch (PDOException $e) {
-        error_log("Get archived items error: " . $e->getMessage());
+        error_log("Get archived items error for table {$table}: " . $e->getMessage());
         return [];
     }
 }
 
 /**
  * Bulk archive multiple records
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name
  * @param string $id_column Primary key column name
  * @param array $ids Array of record IDs to archive
@@ -212,6 +230,8 @@ function getArchivedItems($conn, $table, $limit = 50, $offset = 0) {
  */
 function bulkArchive($conn, $table, $id_column, $ids, $user_id = null) {
     try {
+        if (empty($ids)) return true;
+        
         $conn->beginTransaction();
         
         $placeholders = str_repeat('?,', count($ids) - 1) . '?';
@@ -245,8 +265,7 @@ function bulkArchive($conn, $table, $id_column, $ids, $user_id = null) {
 
 /**
  * Auto-archive old records based on criteria
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name
  * @param string $date_column Column to check for age
  * @param int $days_old Records older than this many days will be archived
@@ -278,8 +297,7 @@ function autoArchiveOldRecords($conn, $table, $date_column, $days_old = 365, $us
 
 /**
  * Get archive statistics
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @return array Statistics array
  */
 function getArchiveStatistics($conn) {
@@ -292,6 +310,7 @@ function getArchiveStatistics($conn) {
         ];
         
         // Total archived items
+        // This query assumes 'archived_items_summary' exists and is correct.
         $stmt = $conn->query("
             SELECT SUM(archived_count) as total 
             FROM archived_items_summary
@@ -335,8 +354,7 @@ function getArchiveStatistics($conn) {
 
 /**
  * Check if a record is archived
- * 
- * @param PDO $conn Database connection
+ * * @param PDO $conn Database connection
  * @param string $table Table name
  * @param string $id_column Primary key column name
  * @param int $id Record ID

@@ -5,12 +5,59 @@
  */
 
 require_once '../config.php';
-require_once 'includes/archive_functions.php'; // Make sure this file exists
+require_once 'includes/archive_functions.php';
 
 if (!function_exists('h')) {
     function h($text) {
         return htmlspecialchars($text ?? '', ENT_QUOTES, 'UTF-8');
     }
+}
+
+/**
+ * Helper function to render table cell content conditionally.
+ */
+function renderArchiveTableCell($item, $col) {
+    // Handle image file columns
+    if ($col === 'image_filename' || $col === 'logo_image_file') {
+        $imgPath = '../' . ($item[$col] ?? '');
+        if (!empty($item[$col]) && file_exists($imgPath)) {
+            return '<img src="' . h($imgPath) . '" class="thumbnail-preview" alt="Preview">';
+        }
+        return '<span class="text-muted">No image</span>';
+    }
+    
+    // Handle date columns
+    if (($col === 'archived_at' || $col === 'submission_date' || $col === 'deadline') && !empty($item[$col])) {
+        return date('M d, Y H:i', strtotime($item[$col]));
+    }
+
+    // Handle status badges
+    if ($col === 'status' && isset($item[$col])) {
+        $statusColors = [
+            'pending' => 'secondary',
+            'reviewed' => 'info',
+            'shortlisted' => 'success',
+            'rejected' => 'danger',
+            'active' => 'success',
+            'inactive' => 'secondary'
+        ];
+        $color = $statusColors[$item[$col]] ?? 'secondary';
+        return '<span class="badge bg-' . $color . '">' . ucfirst(h($item[$col])) . '</span>';
+    }
+
+    // Handle boolean fields
+    if (($col === 'is_active') && isset($item[$col])) {
+        return $item[$col] ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">Inactive</span>';
+    }
+
+    // Truncate long text fields
+    if (in_array($col, ['description', 'cover_letter', 'requirements']) && !empty($item[$col])) {
+        $text = h($item[$col]);
+        return strlen($text) > 100 ? substr($text, 0, 100) . '...' : $text;
+    }
+
+    // Default: just escape the text
+    return h($item[$col] ?? '-');
 }
 
 // Authentication Check
@@ -60,7 +107,9 @@ try {
         'partners' => getArchivedCount($conn, 'partners'),
         'testimonials' => getArchivedCount($conn, 'testimonials'),
         'experiences' => getArchivedCount($conn, 'experiences'),
-        'inquiries' => getArchivedCount($conn, 'inquiries')
+        'inquiries' => getArchivedCount($conn, 'inquiries'),
+        'applications' => getArchivedCount($conn, 'applications'), 
+        'opportunities' => getArchivedCount($conn, 'opportunities')
     ];
 
     $totalArchived = array_sum($archiveCounts);
@@ -94,7 +143,7 @@ $tableConfigs = [
         'name' => 'Partners',
         'id_column' => 'partner_id',
         'icon' => 'bi-building',
-        'columns' => ['partner_id' => 'ID', 'name' => 'Name', 'archived_at' => 'Archived']
+        'columns' => ['partner_id' => 'ID', 'name' => 'Name', 'logo_image_file' => 'Logo', 'archived_at' => 'Archived']
     ],
     'testimonials' => [
         'name' => 'Testimonials',
@@ -113,6 +162,18 @@ $tableConfigs = [
         'id_column' => 'inquiry_id',
         'icon' => 'bi-envelope',
         'columns' => ['inquiry_id' => 'ID', 'full_name' => 'Name', 'email' => 'Email', 'archived_at' => 'Archived']
+    ],
+    'applications' => [
+        'name' => 'Applications',
+        'id_column' => 'application_id',
+        'icon' => 'bi-person-lines-fill',
+        'columns' => ['application_id' => 'ID', 'full_name' => 'Applicant', 'email' => 'Email', 'status' => 'Status', 'submission_date' => 'Submitted', 'archived_at' => 'Archived']
+    ],
+    'opportunities' => [
+        'name' => 'Opportunities',
+        'id_column' => 'opportunity_id',
+        'icon' => 'bi-lightbulb',
+        'columns' => ['opportunity_id' => 'ID', 'title' => 'Title', 'job_type' => 'Type', 'location' => 'Location', 'deadline' => 'Deadline', 'is_active' => 'Was Active', 'archived_at' => 'Archived']
     ]
 ];
 ?>
@@ -189,6 +250,7 @@ $tableConfigs = [
         .action-buttons {
             display: flex;
             gap: 8px;
+            justify-content: center;
         }
 
         .thumbnail-preview {
@@ -197,6 +259,15 @@ $tableConfigs = [
             object-fit: cover;
             border-radius: 8px;
             border: 1px solid var(--border-color);
+        }
+
+        .table td {
+            vertical-align: middle;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, rgba(205, 145, 158, 0.1), rgba(118, 75, 162, 0.1));
+            border-bottom: 2px solid var(--border-color);
         }
     </style>
 </head>
@@ -235,10 +306,10 @@ $tableConfigs = [
                     </div>
                 <?php endif; ?>
 
-                <!-- Archive Categories -->
+                <!-- Archive Category Cards -->
                 <div class="row g-3 mb-4">
                     <?php foreach ($tableConfigs as $table => $config): ?>
-                        <div class="col-6 col-md-4 col-lg-2">
+                        <div class="col-6 col-md-4 col-lg-3">
                             <a href="?tab=<?php echo $table; ?>" class="text-decoration-none">
                                 <div class="archive-stat-card <?php echo $activeTab === $table ? 'active' : ''; ?>">
                                     <div class="archive-icon">
@@ -252,7 +323,6 @@ $tableConfigs = [
                     <?php endforeach; ?>
                 </div>
 
-                <!-- Archived Items Table -->
                 <?php if ($activeTab !== 'all'): ?>
                     <div class="card">
                         <div class="card-header d-flex justify-content-between align-items-center">
@@ -287,24 +357,11 @@ $tableConfigs = [
                                                 <tr>
                                                     <?php foreach ($tableConfigs[$activeTab]['columns'] as $col => $label): ?>
                                                         <td>
-                                                            <?php 
-                                                            if ($col === 'image_filename' || $col === 'logo_image_file') {
-                                                                $imgPath = '../' . ($item[$col] ?? '');
-                                                                if (!empty($item[$col]) && file_exists($imgPath)) {
-                                                                    echo '<img src="' . h($imgPath) . '" class="thumbnail-preview" alt="Preview">';
-                                                                } else {
-                                                                    echo '<span class="text-muted">No image</span>';
-                                                                }
-                                                            } elseif ($col === 'archived_at') {
-                                                                echo date('M d, Y H:i', strtotime($item[$col]));
-                                                            } else {
-                                                                echo h($item[$col] ?? '-');
-                                                            }
-                                                            ?>
+                                                            <?php echo renderArchiveTableCell($item, $col); ?>
                                                         </td>
                                                     <?php endforeach; ?>
                                                     <td>
-                                                        <div class="action-buttons justify-content-center">
+                                                        <div class="action-buttons">
                                                             <form method="POST" style="display: inline;">
                                                                 <input type="hidden" name="action" value="restore">
                                                                 <input type="hidden" name="table" value="<?php echo $activeTab; ?>">
@@ -333,7 +390,6 @@ $tableConfigs = [
                         </div>
                     </div>
                 <?php else: ?>
-                    <!-- Overview Stats -->
                     <div class="card">
                         <div class="card-header">
                             <h5 class="mb-0">
@@ -371,6 +427,21 @@ $tableConfigs = [
                                                 <li>Files are preserved when archived</li>
                                             </ul>
                                         </div>
+                                        
+                                        <?php if ($archiveCounts['applications'] > 0 || $archiveCounts['opportunities'] > 0): ?>
+                                            <div class="alert alert-warning mt-3">
+                                                <i class="bi bi-exclamation-triangle me-2"></i>
+                                                <strong>Applications & Opportunities:</strong>
+                                                <ul class="mb-0 mt-2">
+                                                    <?php if ($archiveCounts['applications'] > 0): ?>
+                                                        <li><?php echo $archiveCounts['applications']; ?> archived job applications</li>
+                                                    <?php endif; ?>
+                                                    <?php if ($archiveCounts['opportunities'] > 0): ?>
+                                                        <li><?php echo $archiveCounts['opportunities']; ?> archived opportunities</li>
+                                                    <?php endif; ?>
+                                                </ul>
+                                            </div>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             <?php else: ?>

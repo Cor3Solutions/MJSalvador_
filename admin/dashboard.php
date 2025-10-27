@@ -26,6 +26,58 @@ if (!isset($_SESSION['full_name']) && isset($_SESSION['user_id'])) {
         error_log("Dashboard session load error: " . $e->getMessage());
     }
 }
+// 2. DATABASE QUERY FUNCTION (Place this after your getDBConnection function)
+function getMonthlyInquiryVolume() {
+    $pdo = getDBConnection();
+    
+    // 1. Prepare the query: Count inquiries grouped by month/year
+    $sql = "
+        SELECT
+            DATE_FORMAT(submission_date, '%Y-%m') AS inquiry_month,
+            COUNT(inquiry_id) AS inquiry_count
+        FROM inquiries
+        WHERE submission_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+        GROUP BY inquiry_month
+        ORDER BY inquiry_month ASC
+    ";
+
+    $stmt = $pdo->query($sql);
+    $monthlyData = [];
+
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        // Cast the count to an integer as expected by Chart.js
+        $monthlyData[$row['inquiry_month']] = (int)$row['inquiry_count'];
+    }
+
+    // 2. Generate the last 12 months for a complete data set 
+    $chartLabels = [];
+    $chartData = [];
+
+    // Loop through the last 12 months
+    for ($i = 11; $i >= 0; $i--) {
+        // Calculate the month and year for internal lookup
+        $targetTimestamp = strtotime("-$i month");
+        $targetMonthYear = date('Y-m', $targetTimestamp);
+        
+        // Format the month for the chart label (e.g., 'Oct 2025')
+        $displayMonth = date('M Y', $targetTimestamp);
+
+        // Populate the labels array
+        $chartLabels[] = $displayMonth;
+
+        // Get the count from the fetched data, or default to 0
+        $count = $monthlyData[$targetMonthYear] ?? 0;
+        $chartData[] = $count;
+    }
+
+    return [
+        'labels' => $chartLabels,
+        'data' => $chartData
+    ];
+}
+
+// 3. EXECUTE THE FUNCTION AND SET THE VARIABLE
+$chart_data = getMonthlyInquiryVolume();
 
 $total_inquiries = $unread_inquiries = $total_portraits = $total_videos = $total_partners = $approved_testimonials = $applicationCount = 0;
 $recent_inquiries = [];
@@ -41,7 +93,7 @@ try {
 
     $stmt = $conn->query("SELECT COUNT(*) as total FROM inquiries WHERE is_read = 0");
     $unread_inquiries = $stmt->fetch()['total'];
-    
+
     // Calculate Read Inquiries
     $read_inquiries = $total_inquiries - $unread_inquiries;
     if ($total_inquiries > 0) {
@@ -64,7 +116,7 @@ try {
     $recent_inquiries = $stmt->fetchAll();
 
     $stmt = $conn->query("SELECT COUNT(*) as total FROM applications WHERE is_archived = 0");
-    $applicationCount = $stmt->fetchColumn(); 
+    $applicationCount = $stmt->fetchColumn();
 
     // Placeholder data for the chart (In a real app, you'd fetch this from the DB, grouped by month)
     $chart_data = [
@@ -143,7 +195,7 @@ $currentPage = 'dashboard.php';
             --stat-color-end: #FCD34D;
         }
 
-        .stat-card.card-applications { 
+        .stat-card.card-applications {
             --stat-color-start: #fa13f6ff;
             --stat-color-end: #9e1b79ff;
         }
@@ -188,7 +240,7 @@ $currentPage = 'dashboard.php';
             color: white;
             margin-top: 0.5rem;
         }
-        
+
         /* New styles for analytic summary cards */
         .summary-card {
             background: var(--bg-secondary);
@@ -209,7 +261,7 @@ $currentPage = 'dashboard.php';
             color: var(--text-secondary);
             text-transform: uppercase;
         }
-        
+
         .progress-bar-label {
             position: absolute;
             width: 100%;
@@ -352,7 +404,7 @@ $currentPage = 'dashboard.php';
                             <?php endif; ?>
                         </div>
                     </div>
-                    
+
                     <div class="col-12 col-sm-4 col-lg-3 col-xl-2">
                         <div class="stat-card card-portraits">
                             <div class="stat-icon"><i class="bi bi-person-bounding-box"></i></div>
@@ -396,7 +448,7 @@ $currentPage = 'dashboard.php';
 
                 <h3 class="h5 fw-bold mb-3 mt-4 text-secondary">Inquiry Performance Analytics</h3>
                 <div class="row g-4 mb-5">
-                    
+
                     <div class="col-lg-8">
                         <div class="card table-card h-100">
                             <div class="card-header">
@@ -413,10 +465,10 @@ $currentPage = 'dashboard.php';
                             <div class="card table-card mb-4 p-3 flex-grow-1" style="background: var(--bg-tertiary);">
                                 <div class="card-title h6 fw-bold text-uppercase text-secondary">Response Rate</div>
                                 <div class="progress mb-3" style="height: 30px; position: relative;">
-                                    <div class="progress-bar bg-success" role="progressbar" 
-                                         style="width: <?php echo $inquiry_read_percent; ?>%" 
-                                         aria-valuenow="<?php echo $inquiry_read_percent; ?>" aria-valuemin="0" 
-                                         aria-valuemax="100">
+                                    <div class="progress-bar bg-success" role="progressbar"
+                                        style="width: <?php echo $inquiry_read_percent; ?>%"
+                                        aria-valuenow="<?php echo $inquiry_read_percent; ?>" aria-valuemin="0"
+                                        aria-valuemax="100">
                                     </div>
                                     <span class="progress-bar-label"><?php echo $inquiry_read_percent; ?>% Read</span>
                                 </div>
@@ -436,37 +488,21 @@ $currentPage = 'dashboard.php';
                                 </div>
                             </div>
                             <div class="card table-card flex-grow-1 p-3">
-                                <div class="card-title h6 fw-bold text-uppercase text-secondary">Placeholder Metric</div>
-                                <p class="text-muted small">This space can be used for a pie chart of inquiry types (Portrait vs Video) or a quick link to a full report.</p>
+                                <div class="card-title h6 fw-bold text-uppercase text-secondary">Placeholder Metric
+                                </div>
+                                <p class="text-muted small">This space can be used for a pie chart of inquiry types
+                                    (Portrait vs Video) or a quick link to a full report.</p>
                             </div>
                         </div>
                     </div>
-                </div> 
+                </div>
             </main>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-        function updateClock() {
-            const now = new Date();
-            
-            // Format Time (12-hour format)
-            const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-            const timeString = now.toLocaleTimeString('en-US', timeOptions);
-            document.getElementById('adminClockTime').textContent = timeString;
 
-            // Format Date
-            const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-            const dateString = now.toLocaleDateString('en-US', dateOptions);
-            document.getElementById('adminClockDate').textContent = dateString;
-        }
-
-        // Run the function immediately, then update every second
-        updateClock();
-        setInterval(updateClock, 1000);updateClock
-
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const ctx = document.getElementById('monthlyInquiriesChart').getContext('2d');
             const chartData = {
                 labels: <?php echo json_encode($chart_data['labels']); ?>,
@@ -516,11 +552,10 @@ $currentPage = 'dashboard.php';
                         }
                     }
                 }
-                
+
             });
-            
-        });
-    }
+
+        }); 
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

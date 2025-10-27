@@ -1,5 +1,14 @@
 <?php
+/**
+ * Homepage - Main landing page
+ * Displays banner, partners, CVs, gallery, opportunities, and testimonials
+ */
+
 require_once 'config.php';
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 if (!function_exists('h')) {
   function h($text)
@@ -7,104 +16,113 @@ if (!function_exists('h')) {
     return htmlspecialchars((string) $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
   }
 }
-if (!function_exists('array_chunk_preserve_keys')) {
-  function array_chunk_preserve_keys(array $array, int $size, bool $preserve_keys = true): array
-  {
-    $chunks = [];
-    if ($size <= 0) {
-      return $chunks;
-    }
-    $count = count($array);
-    for ($i = 0; $i < $count; $i += $size) {
-      $chunks[] = array_slice($array, $i, $size, $preserve_keys);
-    }
-    return $chunks;
-  }
-}
-try {
-  $conn = getDBConnection();
 
-  // Fetch only NON-ARCHIVED partners
+// ============================================================================
+// DATABASE QUERIES
+// ============================================================================
+
+$conn = getDBConnection();
+
+// Initialize all data arrays
+$partners = [];
+$testimonials = [];
+$portraits = [];
+$opportunities = [];
+$featured_cvs = [];
+$db_error = null;
+
+try {
+  // Fetch non-archived partners
   $stmt = $conn->prepare("SELECT * FROM partners WHERE is_archived = 0 ORDER BY sort_order ASC");
   $stmt->execute();
   $partners = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-  // Fetch only NON-ARCHIVED and approved testimonials (limit 3 for homepage)
+  // Fetch approved, non-archived testimonials
   $stmt = $conn->prepare("SELECT * FROM testimonials WHERE is_approved = 1 AND is_archived = 0 ORDER BY testimonial_id DESC LIMIT 3");
   $stmt->execute();
   $testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-  // Fetch only NON-ARCHIVED gallery portraits (limit 6 for homepage)
-  $stmt = $conn->prepare("SELECT * FROM portraits WHERE is_archived = 0 ORDER BY sort_order ASC LIMIT 6");
+  // Fetch non-archived gallery portraits
+  $stmt = $conn->prepare("SELECT * FROM portraits WHERE is_archived = 0 ORDER BY portrait_id DESC LIMIT 3");
   $stmt->execute();
   $portraits = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-  // Fetch only NON-ARCHIVED professional experiences
-  $stmt = $conn->prepare("SELECT * FROM opportunities WHERE is_active = 1 ORDER BY deadline ASC, opportunity_id DESC");
+  
+  // Fetch active opportunities
+  $stmt = $conn->prepare("SELECT * FROM opportunities WHERE is_active = 1 AND is_archived = 0 ORDER BY opportunity_id DESC");
   $stmt->execute();
   $opportunities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+  // Fetch featured CVs
+  $stmt = $conn->query("
+        SELECT r.resume_id, r.original_filename, r.filepath, r.cv_type, r.upload_date,
+               CASE WHEN cp.id IS NOT NULL THEN 1 ELSE 0 END as has_password
+        FROM resumes r
+        LEFT JOIN cv_passwords cp ON r.resume_id = cp.resume_id
+        WHERE r.is_featured = 1
+        ORDER BY r.display_order ASC
+        LIMIT 2
+    ");
+  $featured_cvs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (PDOException $e) {
   error_log("Database Error on Homepage: " . $e->getMessage());
-  $partners = [];
-  $testimonials = [];
-  $portraits = [];
-  $opportunities = [];
+  $db_error = "Unable to load some content due to a server issue.";
 }
-?>
 
+$has_testimonials = !empty($testimonials);
+?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Jade S. | Executive VA • Model • Actress</title>
 
-  <meta charset="UTF-8">
-
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
-
+  <!-- SEO Meta Tags -->
   <meta property="og:title" content="Jade Salvador | Executive VA • Model • Actress">
-
   <meta property="og:description"
     content="Explore Jade Salvador's professional portfolio as an Executive Virtual Assistant, freelance model, and actress.">
-
   <meta property="og:image" content="https://cor3solutions.github.io/MJ-Salvador/images/icon.png">
-
   <meta property="og:url" content="https://jadesalvador.com">
-
 
   <link rel="icon" type="image/png" href="images/logo.png">
 
+  <!-- CSS Libraries -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.css" />
-
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-
-
-  <link rel="stylesheet" href="css/vendor.css">
-
-  <link rel="stylesheet" href="css/style.css">
-
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
     rel="stylesheet">
 
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/vendor.css">
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- SweetAlert2 -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-</head>
 
-<body>
-  <?php include 'navbar.php'; ?>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'primary-pink': '#cd919e',
+            'soft-pink': '#fef7f9',
+            'dark-text': '#1f2937',
+          }
+        }
+      }
+    }
+  </script>
 
-  <style> 
-    /* --- General Colors (Adjust to your brand palette if needed) --- */
+  <style>
+    /* CSS VARIABLES */
     :root {
       --jade-primary: #4CAF50;
-      /* A pleasant green/jade */
       --jade-primary-hover: #45a049;
       --text-primary: #333;
       --bg-light: #f8f9fa;
@@ -112,9 +130,12 @@ try {
       --border-color: #eee;
     }
 
-    /* --- Opportunities Section Styling --- */
+    /* GENERAL STYLES */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f7f7f7;
+    }
 
-    /* Ensure the cards look nice and elevated */
     .card {
       border: none;
       border-radius: 12px;
@@ -126,134 +147,18 @@ try {
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
     }
 
-    .card-title {
-      color: var(--text-primary);
-      font-weight: 700;
+    /* BANNER SECTION */
+    .banner-section {
+      background-color: #ffe4ec;
     }
 
-    /* Badge styling for job type */
-    .badge.bg-primary {
-      background-color: var(--jade-primary) !important;
-      font-weight: 500;
-      padding: 0.4em 0.8em;
-      border-radius: 6px;
-    }
-
-    /* Button styling */
-    .btn-outline-primary {
-      color: var(--jade-primary);
-      border-color: var(--jade-primary);
-      transition: all 0.2s;
-    }
-
-    .btn-outline-primary:hover {
-      background-color: var(--jade-primary);
-      color: white;
-    }
-
-    /* --- Swiper Navigation Styling (Crucial for Design) --- */
-
-   /* --- Swiper Navigation Styling (Fix for Overflow) --- */
-
-.swiper-opportunities {
-    /* Set a max-width to match the content above (Bootstrap's LG or XL container size) */
-    /* This ensures it aligns with the pink section's content width */
-    max-width: 1140px; /* Example: Matches Bootstrap's .container-xl */
-    
-    /* Center the block element */
-    margin: 0 auto; 
-    
-    /* Crucial: Padding removed from the container to prevent visual overflow */
-    padding: 0; 
-    overflow: hidden; 
-    
-    padding-top: 20px;
-    padding-bottom: 40px;
-}
-
-/* Style the Swiper custom navigation arrows */
-.swiper-button-next,
-.swiper-button-prev {
-    /* Set the buttons to position themselves relative to the container, not the viewport */
-    top: 50%;
-    transform: translateY(-50%);
-    
-    /* Position them slightly outside the wrapper for a clean look, but the overall element is constrained by max-width */
-    /* Use 'calc' to push the buttons 15px from the edge of the max-width */
-    z-index: 10;
-}
-
-.swiper-button-next {
-    right: 5px; /* Adjust as needed */
-}
-.swiper-button-prev {
-    left: 5px; /* Adjust as needed */
-}
-
-/* Responsive adjustment for phones */
-@media (max-width: 1200px) {
-    /* On medium screens, adjust max-width to match that container size */
-    .swiper-opportunities {
-        max-width: 960px; /* Example: Matches Bootstrap's .container-lg */
-    }
-}
-@media (max-width: 767.98px) {
-    .swiper-opportunities {
-        /* On mobile, use the full viewport width minus container padding */
-        max-width: 100%; 
-        padding: 0 15px; /* Add slight padding for mobile swipe edge */
-    }
-    
-    /* Hide the arrows on small screens for a cleaner, touch-focused experience */
-    .swiper-button-next,
-    .swiper-button-prev {
-        display: none; 
-    }
-}
-
-/* Sets a reasonable minimum height for the card itself */
-.swiper-opportunities .card {
-    /* If your cards are getting too tall, uncomment this line */
-    /* max-height: 500px; */ 
-    
-    /* Ensure all cards have at least enough space for content + button */
-    min-height: 350px; 
-}
-
-/* Ensure the card body expands to fill available space */
-.swiper-opportunities .card .card-body {
-    flex-grow: 1;
-}
-
-/* Fix for buttons being pushed too low */
-.swiper-opportunities .card .card-body .btn-outline-primary {
-    /* Revert this line if you use the recommended HTML structure with mt-auto */
-    /* margin-top: auto; */ 
-}
-
-    /* banner section */
     .intro-box {
       position: absolute;
       bottom: -100px;
       z-index: 9;
       left: 50%;
       transform: translateX(-50%);
-    }
-
-    .quote-box {
-      position: absolute;
-      width: 100%;
-      left: 0;
-      bottom: 0;
-      z-index: 9;
-    }
-
-    .highlights-box {
-      position: absolute;
-      width: 100%;
-      left: 0;
-      bottom: 0;
-      z-index: 9;
+      transition: all 0.3s ease;
     }
 
     @media only screen and (max-width: 991px) {
@@ -265,52 +170,9 @@ try {
         position: relative;
         bottom: 0;
       }
-
-      .quote-box {
-        position: relative;
-        bottom: 0;
-      }
-
-      .highlights-box {
-        position: relative;
-        bottom: 0;
-      }
     }
 
-    @media only screen and (max-width: 991px) {
-      .course-content {
-        flex-direction: column-reverse;
-      }
-    }
-
-    .card img {
-      transition: transform 0.3s ease;
-    }
-
-    .card:hover img {
-      transform: scale(1.05);
-    }
-
-    .vtr-item {
-      padding: 15px;
-    }
-
-    .ratio-9x16 {
-      position: relative;
-      width: 100%;
-      padding-top: 177.77%;
-      margin-bottom: 15px;
-    }
-
-    .ratio-9x16 iframe {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-    }
-
-    /* Desktop (default) */
+    /* SWIPER STYLES */
     .fixed-slide {
       width: 3in;
       height: 5in;
@@ -332,43 +194,47 @@ try {
       padding-bottom: 40px;
     }
 
-    /* 📱 Mobile Layout Refined */
     @media (max-width: 768px) {
-      .swiper-wrapper {
-        flex-wrap: nowrap !important;
-      }
-
       .swiper-slide {
         display: flex !important;
         justify-content: center;
         align-items: center;
-        flex: 0 0 auto;
-        width: 90vw;
       }
 
       .fixed-slide {
         max-width: 90vw;
         height: auto;
         aspect-ratio: 3 / 5;
-        overflow: hidden;
         margin: 10px auto;
         border-radius: 12px;
       }
-
-      .fixed-slide img,
-      .fixed-slide video {
-        object-fit: cover;
-        width: 100%;
-        height: 100%;
-        display: block;
-      }
-
-      .swiper {
-        padding: 20px 15px 40px;
-      }
     }
 
-    /* === FIXED MODAL COLORS === */
+    /* CV SECTION */
+    .cv-card {
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      border: none;
+    }
+
+    .cv-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+    }
+
+    .cv-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto;
+      background: linear-gradient(135deg, #cd919e, #764ba2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      color: white;
+    }
+
+    /* MODALS */
     .modal-content {
       background-color: #fff !important;
       color: #333 !important;
@@ -384,31 +250,20 @@ try {
       border-top-right-radius: 16px;
     }
 
-    .modal-title {
-      font-weight: 700;
-      color: #333;
-    }
-
-    .modal-body {
-      background-color: #fff !important;
-    }
-
-    .modal-footer {
-      background-color: #fff !important;
-      border-top: 1px solid #eee;
-    }
-
-    .form-label {
-      color: #333 !important;
-      font-weight: 600;
-    }
-
     .form-control,
     .form-select {
       background-color: #fff;
       color: #333;
       border: 1px solid #ccc;
       border-radius: 8px;
+      padding: 0.75rem 1rem;
+      transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+
+    .form-control:focus {
+      border-color: #cd919e;
+      box-shadow: 0 0 0 3px rgba(205, 145, 158, 0.25);
+      outline: none;
     }
 
     .btn-submit-inquiry {
@@ -424,154 +279,579 @@ try {
       background-color: #b87c88;
     }
 
-    .btn-close {
-      filter: invert(0);
+    /* CUSTOM TESTIMONIAL MODAL */
+    .custom-testimonial-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1050;
+      transition: opacity 0.3s ease;
+      opacity: 0;
     }
 
-    .modal-backdrop.show {
-      opacity: 0.6 !important;
-      background-color: rgba(0, 0, 0, 0.6);
+    .custom-testimonial-modal.open {
+      display: flex;
+      opacity: 1;
+    }
+
+    .custom-testimonial-modal .modal-content {
+      background: white;
+      border-radius: 1rem;
+      max-width: 90%;
+      width: 450px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* TESTIMONIAL STYLES */
+    .testimonial-card {
+      border-radius: 1rem;
+      background-color: white;
+      transition: transform 0.3s ease-in-out;
+      border: 1px solid #f3f4f6;
+    }
+
+    .testimonial-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    .swiper-pagination-bullet {
+      width: 10px;
+      height: 10px;
+      opacity: 1;
+      background: #d1d5db;
+      transition: background-color 0.3s;
+    }
+
+    .swiper-pagination-bullet-active {
+      background: #cd919e;
+      width: 12px;
+      height: 12px;
+    }
+
+    /* 1. Aspect Ratio and Card Styling (Applies to all screens) */
+    .event-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease-in-out;
+    }
+
+    .aspect-ratio-box {
+      position: relative;
+      width: 100%;
+      height: 0;
+      overflow: hidden;
+    }
+
+    /* 9:16 Portrait ratio: (16 / 9) * 100% = 177.777...% */
+    .aspect-ratio-16x9 {
+      padding-bottom: 177.78%;
+      /* Forces 9:16 portrait height */
+    }
+
+    .event-image {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .event-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /* Ensures image fills the container */
+    }
+
+    /* --- MOBILE SWIPER STYLES (Applies only to phones) --- */
+    @media (max-width: 767.98px) {
+
+      /* 2. Enable Horizontal Scroll on the Row */
+      .mobile-scroll-row {
+        flex-wrap: nowrap;
+        /* Prevents items from wrapping */
+        overflow-x: scroll;
+        /* Enables swiping */
+        -webkit-overflow-scrolling: touch;
+        /* Better iOS scrolling */
+
+        /* Optional: Adjust padding for edge-to-edge swiping effect */
+        margin-left: -15px;
+        /* Compensate for Bootstrap row padding */
+        margin-right: -15px;
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+
+      /* 3. Define Card Width for Mobile */
+      .mobile-scroll-row>div[class*="col-"] {
+        flex: 0 0 85%;
+        /* Card takes up 85% of screen width */
+        max-width: 85%;
+        margin-right: 15px;
+        /* Spacing between cards */
+
+        /* Ensure no extra padding from col classes ruins the swiping */
+        padding-left: 0;
+        padding-right: 0;
+      }
+
+      /* 4. Hide Scrollbar (Optional) */
+      .mobile-scroll-row::-webkit-scrollbar {
+        display: none;
+      }
+    }
+
+    .btn-custom {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, #cd919e, #764ba2);
+      color: white;
+      padding: 16px 48px;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 16px;
+      text-decoration: none;
+      box-shadow: 0 8px 24px rgba(118, 75, 162, 0.3);
+      transition: all 0.3s ease;
+      border: none;
+    }
+
+    .btn-custom:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(118, 75, 162, 0.4);
+      background: linear-gradient(135deg, #764ba2, #cd919e);
+      color: white;
+    }
+
+    /* OPPORTUNITIES TOGGLE */
+    .toggle-details-btn .icon-chevron {
+      transition: transform 0.3s ease;
+      display: inline-block;
+    }
+
+    .toggle-details-btn.active .icon-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* OPPORTUNITIES SWIPER CARD FIXES */
+    .swiper-opportunities {
+      padding-bottom: 60px !important;
+    }
+
+    .swiper-opportunities .swiper-slide {
+      height: auto;
+      display: flex;
+    }
+
+    .swiper-opportunities .card {
+      width: 100%;
+      min-height: 450px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .swiper-opportunities .card-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .swiper-opportunities .card-text {
+      flex-grow: 1;
+    }
+
+    .swiper-opportunities .btn.mt-3 {
+      margin-top: auto !important;
+    }
+
+    /* Fixed heights for content sections */
+    .swiper-opportunities .card-title {
+      min-height: 3rem;
+      display: flex;
+      align-items: center;
+    }
+
+    .swiper-opportunities .card-text.small {
+      min-height: 60px;
+    }
+
+    /* 1. Base Event Card Styles */
+    .event-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      transition: transform 0.3s ease-in-out;
+    }
+
+    /* 2. Aspect Ratio Box for 9:16 PORTRAIT */
+    .aspect-ratio-box {
+      position: relative;
+      width: 100%;
+      height: 0;
+      overflow: hidden;
+    }
+
+    /* 9:16 ratio: (16 / 9) * 100% = 177.777...% */
+    /* *** REVERTED TO 9:16 PORTRAIT ASPECT RATIO *** */
+    .aspect-ratio-16x9 {
+      padding-bottom: 177.78%;
+    }
+
+    /* 3. Event Image Container and Image styles (Keep as is) */
+    .event-image {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .event-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    @media (max-width: 767.98px) {
+
+      /* * TARGET: The row that holds the cards. 
+     * This class must be applied to the row div in your PHP.
+     */
+      .mobile-scroll-row {
+        /* This is crucial: prevents wrapping, forces horizontal alignment */
+        flex-wrap: nowrap;
+
+        /* Enables the horizontal swiping/scrolling */
+        overflow-x: auto;
+
+        /* Hides the scrollbar for a cleaner "swiper" look (optional, but common) */
+        -webkit-overflow-scrolling: touch;
+        -ms-overflow-style: none;
+        /* IE and Edge */
+        scrollbar-width: none;
+        /* Firefox */
+        padding-bottom: 15px;
+        /* Ensures space if scrollbar is shown */
+
+        /* To hide scrollbar visually: */
+        &::-webkit-scrollbar {
+          display: none;
+        }
+      }
+
+      .mobile-scroll-row {
+        /* Remove default row padding on mobile */
+        margin-left: 0;
+        margin-right: 0;
+
+        /* Add padding to the row to create space on the left and right edges */
+        padding-left: 20px;
+        padding-right: 20px;
+
+        /* Add this to allow horizontal scrolling on the padding itself */
+        overflow-x: auto;
+      }
+
+      /* Remove default column padding */
+      .mobile-scroll-row>div[class*="col-"] {
+        padding-left: 0;
+        padding-right: 0;
+        /* ... (rest of the mobile card sizing) ... */
+      }
+    } 
+    /* ANNOUNCEMENT WIDGET */
+    .announcement-widget {
+      position: fixed;
+      top: 50%;
+      right: 20px;
+      transform: translateY(-50%);
+      z-index: 1000;
+      background: linear-gradient(135deg, rgba(205, 145, 158, 0.9), rgba(118, 75, 162, 0.9));
+      backdrop-filter: blur(10px);
+      color: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      cursor: pointer;
+      transition: all 0.3s ease;
+      max-width: 200px;
+      text-align: center;
+      animation: pulse 2s infinite;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .announcement-widget:hover {
+      transform: translateY(-50%) scale(1.05);
+      box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+    }
+
+    .announcement-widget .icon {
+      font-size: 2rem;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .announcement-widget .text {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 1.3;
+      margin-bottom: 8px;
+    }
+
+    .announcement-widget .subtext {
+      font-size: 11px;
+      opacity: 0.9;
+      font-weight: 400;
+    }
+
+    .announcement-widget .arrow {
+      font-size: 1.2rem;
+      margin-top: 5px;
+      display: block;
+      animation: bounce 1.5s infinite;
+    }
+
+    .announcement-widget .minimize-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+
+    .announcement-widget .minimize-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: scale(1.1);
+    }
+
+    .announcement-widget.minimized {
+      max-width: 60px;
+      padding: 15px 10px;
+      cursor: pointer;
+    }
+
+    .announcement-widget.minimized .content {
+      display: none;
+    }
+
+    .announcement-widget.minimized .minimize-btn {
+      display: none;
+    }
+
+    .announcement-widget.minimized .expand-btn {
+      display: block;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .announcement-widget .expand-btn {
+      display: none;
+    }
+
+    .announcement-widget.minimized .expand-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translate(-50%, -50%) scale(1.1);
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
+      50% { box-shadow: 0 8px 25px rgba(205, 145, 158, 0.3); }
+      100% { box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
+    }
+
+    @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-3px); }
+      60% { transform: translateY(-2px); }
+    }
+
+    /* Mobile responsive adjustments */
+    @media (max-width: 768px) {
+      .announcement-widget {
+        position: fixed;
+        bottom: 20px;
+        right: 15px;
+        top: auto;
+        transform: none;
+        max-width: 150px;
+        padding: 12px;
+        font-size: 12px;
+        border-radius: 12px;
+      }
+
+      .announcement-widget .icon {
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+      }
+
+      .announcement-widget .text {
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+
+      .announcement-widget .subtext {
+        font-size: 10px;
+      }
+
+      .announcement-widget .arrow {
+        font-size: 1rem;
+        margin-top: 4px;
+      }
+    }
+
+    /* Adjust position for smaller screens */
+    @media (max-width: 1200px) and (min-width: 769px) {
+      .announcement-widget {
+        right: 10px;
+        max-width: 180px;
+        padding: 15px;
+      }
     }
   </style>
+</head>
 
-  <section class="banner-section position-relative text-center py-5" style="background-color: #ffe4ec;">
+<body>
+  <?php include 'navbar.php'; ?>
+
+  <!-- ANNOUNCEMENT WIDGET -->
+  <?php if (!empty($opportunities)): ?>
+    <div class="announcement-widget" id="announcementWidget" onclick="scrollToOpportunities()">
+      <button class="minimize-btn" onclick="minimizeAnnouncement(event)">−</button>
+      <button class="expand-btn" onclick="expandAnnouncement(event)">+</button>
+      <div class="content">
+        <i class="bi bi-briefcase-fill icon"></i>
+        <div class="text">View Opportunities</div>
+        <div class="subtext">Current openings available</div>
+        <i class="bi bi-arrow-right arrow"></i>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <!-- BANNER SECTION -->
+  <section class="banner-section position-relative text-center py-5">
     <div class="main-banner swiper">
       <div class="swiper-wrapper">
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/3.1.png" alt="Slide 8">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/3.1.png" alt="Slide 1"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <video autoplay muted loop playsinline>
+          <div class="fixed-slide"><video autoplay muted loop playsinline>
               <source src="images/SWIPE/member-02.mp4" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          </div>
-          <div class="video-overlay"></div>
+            </video></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/member-06.jpg" alt="Slide 3">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/member-06.jpg" alt="Slide 3"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/2nd.png" alt="Slide 3">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/2nd.png" alt="Slide 4"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <video autoplay muted loop playsinline>
+          <div class="fixed-slide"><video autoplay muted loop playsinline>
               <source src="images/SWIPE/747.mp4" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          </div>
-          <div class="video-overlay"></div>
+            </video></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/missu.png" alt="Slide 1">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/missu.png" alt="Slide 6"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/1st.png" alt="Slide 5">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/1st.png" alt="Slide 7"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <video autoplay muted loop playsinline>
+          <div class="fixed-slide"><video autoplay muted loop playsinline>
               <source src="images/SWIPE/litolsweets.mp4" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          </div>
-          <div class="video-overlay"></div>
+            </video></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/3rd.png" alt="Slide 5">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/3rd.png" alt="Slide 9"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/heera.jpg" alt="Slide 8">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/heera.jpg" alt="Slide 10"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <video autoplay muted loop playsinline>
+          <div class="fixed-slide"><video autoplay muted loop playsinline>
               <source src="images/SWIPE/abc.mp4" type="video/mp4">
-              Your browser does not support the video tag">
-            </video>
-          </div>
-          <div class="video-overlay"></div>
+            </video></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/1.1.png" alt="Slide 5">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/1.1.png" alt="Slide 12"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <video autoplay muted loop playsinline>
+          <div class="fixed-slide"><video autoplay muted loop playsinline>
               <source src="images/SWIPE/tg.mp4" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          </div>
-          <div class="video-overlay"></div>
+            </video></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/littlesweets.png" alt="Slide 6">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/littlesweets.png" alt="Slide 14"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <img src="images/SWIPE/blue.png" alt="Slide 6">
-          </div>
+          <div class="fixed-slide"><img src="images/SWIPE/blue.png" alt="Slide 15"></div>
         </div>
-
         <div class="swiper-slide">
-          <div class="fixed-slide">
-            <video autoplay muted loop playsinline>
+          <div class="fixed-slide"><video autoplay muted loop playsinline>
               <source src="images/SWIPE/heeravid.mov" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          </div>
-          <div class="video-overlay"></div>
+            </video></div>
         </div>
-
       </div>
     </div>
 
-    <div class="intro-box col-lg-5 p-5 bg-black bg-opacity-75 text-white rounded-4 shadow-sm"
-      style="transition: all 0.3s ease;">
+    <div class="intro-box col-lg-5 p-5 bg-black bg-opacity-75 text-white rounded-4 shadow-sm">
       <h3 class="display-4 mb-3 text-white" style="font-size: 2rem;">
         Executive Virtual Assistant <br>Freelance Model <br> Actress
       </h3>
       <p class="fs-6 text-white">
         Behind the camera organization to striking visuals on stage and ramp, I bring your vision come alive
-        with style
-        and energy that elevate every project. Aiming to blend professionalism with creativity aiding fashion
-        brands and
-        events bring their creativity to reality.
+        with style and energy that elevate every project. Aiming to blend professionalism with creativity aiding fashion
+        brands and events bring their creativity to reality.
       </p>
       <button type="button" class="btn btn-primary p-3 mt-2 w-100 rounded-2"
         style="background-color: #cd919e; border: none;" data-bs-toggle="modal" data-bs-target="#inquiryModal">
@@ -581,7 +861,7 @@ try {
   </section>
   <br><br>
 
-  <!-- Inquiry Modal with CSRF Token -->
+  <!-- INQUIRY MODAL -->
   <div class="modal fade" id="inquiryModal" tabindex="-1" aria-labelledby="inquiryModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-md modal-dialog-centered">
       <div class="modal-content">
@@ -590,9 +870,7 @@ try {
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <form id="inquiryForm">
-          <!-- CSRF Token Hidden Field -->
           <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
-
           <div class="modal-body p-4">
             <p class="text-muted mb-4">Tell us about your project or collaboration idea! We'll get back to you within
               24–48 hours.</p>
@@ -641,6 +919,7 @@ try {
     </div>
   </div>
 
+  <!-- PARTNERS SECTION -->
   <section class="container-xxl py-5 bg-white">
     <div class="container text-center">
       <h4 class="section-title">Partners</h4>
@@ -657,7 +936,6 @@ try {
                   <div><?php echo h($partner['name']); ?></div>
                 </div>
               <?php endforeach; ?>
-
               <?php foreach ($partners as $partner): ?>
                 <div class="client-logo">
                   <img src="images/partners/<?php echo h($partner['logo_image_file']); ?>"
@@ -672,100 +950,334 @@ try {
     </div>
   </section>
 
-  <section class="my-5 py-5 bg-text" style="background-color: #ffe4ec;">
-    <div class="container">
-      <div class="text-center pt-4 mt-4">
-        <span class="text-muted text-uppercase">Keeping you on the loop</span>
-        <h4 class="display-5 fw-normal mt-2">Gallery Overview</h4>
-        <p class="text-muted">A curated selection of my latest events</p>
-      </div>
+  <!-- CV SECTION -->
+  <section class="container py-5">
+    <div class="text-center mb-5">
+      <h2 class="fw-bold mb-3">My Professional CVs</h2>
+      <p class="text-muted">Download my resume and experience</p>
+    </div>
 
-      <div class="swiper mySwiper mt-4">
-        <div class="swiper-wrapper">
-          <?php foreach ($portraits as $portrait): ?>
-            <div class="swiper-slide">
-              <div class="card border-0 shadow-lg">
-                <div class="card-img-container">
-                  <img src="<?php echo h($portrait['image_filename']); ?>" alt="<?php echo h($portrait['title']); ?>"
-                    class="img-fluid rounded">
+    <?php if (!empty($featured_cvs)): ?>
+      <div class="row justify-content-center g-4">
+        <?php foreach ($featured_cvs as $cv): ?>
+          <div class="col-md-6 col-lg-5">
+            <div class="card shadow-sm h-100 cv-card">
+              <div class="card-body text-center p-4">
+                <div class="cv-icon mb-3">
+                  <i class="bi bi-file-earmark-pdf-fill"></i>
                 </div>
-                <div class="card-body text-center">
-                  <h5 class="card-title"><?php echo h($portrait['title']); ?></h5>
+
+                <h4 class="card-title mb-3"><?php echo h($cv['cv_type'] ?? 'Professional CV'); ?></h4>
+
+                <p class="text-muted small mb-4">
+                  <i class="bi bi-calendar3 me-1"></i>
+                  Updated <?php echo date('M Y', strtotime($cv['upload_date'])); ?>
+                  <?php if ($cv['has_password']): ?>
+                    <br><i class="bi bi-lock-fill me-1"></i>
+                    <span class="text-warning">Password Protected</span>
+                  <?php endif; ?>
+                </p>
+
+                <div class="d-grid gap-2">
+                  <button class="btn btn-outline-primary preview-cv" data-cv-path="<?php echo h($cv['filepath']); ?>"
+                    data-cv-title="<?php echo h($cv['cv_type'] ?? 'CV'); ?>">
+                    <i class="bi bi-eye me-2"></i>Preview
+                  </button>
+                  <button class="btn btn-primary download-cv" data-cv-id="<?php echo $cv['resume_id']; ?>"
+                    data-has-password="<?php echo $cv['has_password']; ?>">
+                    <i class="bi bi-download me-2"></i>Download
+                    <?php if ($cv['has_password']): ?>
+                      <i class="bi bi-lock-fill ms-1"></i>
+                    <?php endif; ?>
+                  </button>
                 </div>
               </div>
             </div>
-          <?php endforeach; ?>
-        </div>
-
-        <div class="swiper-pagination"></div>
-        <div class="swiper-button-next"></div>
-        <div class="swiper-button-prev"></div>
+          </div>
+        <?php endforeach; ?>
       </div>
 
-      <div class="text-center mt-5">
-        <a href="portraits.php"
-          class="btn btn-dark px-5 py-3 rounded-pill shadow-lg fw-semibold d-inline-flex align-items-center gap-2">
-          <i class="bi bi-images"></i> View Full Gallery
+      <div class="text-center mt-4">
+        <small class="text-muted">
+          <i class="bi bi-info-circle me-1"></i>
+          Need the password? <a href="#contact">Contact me</a> for access.
+        </small>
+      </div>
+    <?php else: ?>
+      <div class="text-center py-5">
+        <div class="alert alert-warning">
+          <h5>⚠️ No Featured CVs</h5>
+          <p class="mb-0">CVs will appear here once they are uploaded and featured.</p>
+        </div>
+      </div>
+    <?php endif; ?>
+  </section>
+
+  <!-- CV PREVIEW MODAL -->
+  <div class="modal fade" id="cvPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-eye me-2"></i><span id="previewTitle">CV Preview</span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body p-0" style="height: 80vh;">
+          <div id="previewContainer" class="h-100"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CV PASSWORD MODAL -->
+  <div class="modal fade" id="cvPasswordModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-lock me-2"></i>Password Required</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form id="cvPasswordForm">
+          <div class="modal-body">
+            <p class="text-muted">This CV is password-protected. Please enter the password to download.</p>
+            <input type="hidden" id="passwordCvId" name="cv_id">
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <div class="input-group">
+                <input type="password" class="form-control" id="cvPasswordInput" name="password" required>
+                <button class="btn btn-outline-secondary" type="button" id="togglePwd">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+              <div class="invalid-feedback d-none" id="pwdError">
+                Incorrect password. Please try again.
+              </div>
+            </div>
+            <div class="alert alert-info mb-0">
+              <small>
+                <i class="bi bi-info-circle me-1"></i>
+                Need the password? <a href="#contact" data-bs-dismiss="modal">Contact me</a>.
+              </small>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-unlock me-2"></i>Download
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- GALLERY SECTION -->
+  <section class="my-5 py-5" style="background: linear-gradient(135deg, #ffe4ec 0%, #fff5f7 100%);">
+    <div class="container">
+      <div class="text-center mb-5">
+        <span class="badge rounded-pill px-4 py-2 mb-3"
+          style="background: linear-gradient(135deg, #cd919e, #764ba2); color: white; font-weight: 600; letter-spacing: 0.5px;">
+          KEEPING YOU IN THE LOOP
+        </span>
+        <h2 class="display-4 fw-bold mb-3" style="color: #2d2d2d;">Recent Events</h2>
+        <p class="lead text-muted" style="max-width: 600px; margin: 0 auto;">
+          A glimpse into my latest projects, collaborations, and memorable moments
+        </p>
+      </div>
+
+      <div class="row g-4 d-flex mobile-scroll-row">
+        <?php
+        // PHP Sorting Logic (Keep this)
+        usort($portraits, function ($a, $b) {
+          $time_a = isset($a['event_date']) ? strtotime($a['event_date']) : 0;
+          $time_b = isset($b['event_date']) ? strtotime($b['event_date']) : 0;
+          if ($time_a == $time_b)
+            return 0;
+          return ($time_a > $time_b) ? -1 : 1;
+        });
+
+        $event_count = 0;
+        foreach ($portraits as $portrait):
+          if ($event_count >= 3)
+            break;
+          $event_count++;
+          ?>
+          <div class="col-lg-4 col-md-6">
+            <div class="event-card">
+              <div class="aspect-ratio-box aspect-ratio-16x9">
+                <div class="event-image">
+
+                  <img src="<?php echo h($portrait['image_filename']); ?>" alt="<?php echo h($portrait['title']); ?>">
+
+                  <div
+                    style="position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, transparent 40%, rgba(0,0,0,0.8) 100%); z-index: 1;">
+                  </div>
+
+                  <?php if (isset($portrait['event_date'])): ?>
+                    <div
+                      style="position: absolute; top: 20px; right: 20px; background: white; padding: 8px 16px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 3;">
+                      <div style="text-align: center;">
+                        <div style="font-size: 24px; font-weight: 800; line-height: 1; color: #764ba2;">
+                          <?php echo date('d', strtotime($portrait['event_date'])); ?>
+                        </div>
+                        <div style="font-size: 12px; font-weight: 600; color: #666; text-transform: uppercase;">
+                          <?php echo date('M', strtotime($portrait['event_date'])); ?>
+                        </div>
+                      </div>
+                    </div>
+                  <?php endif; ?>
+
+                  <div style="position: absolute; bottom: 0; left: 0; right: 0; padding: 24px; color: white; z-index: 2;">
+                    <?php if (isset($portrait['category'])): ?>
+                      <span
+                        style="display: inline-block; background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
+                        <?php echo h($portrait['category']); ?>
+                      </span>
+                    <?php endif; ?>
+
+                    <h5 style="font-size: 20px; font-weight: 700; margin: 0; line-height: 1.3;">
+                      <?php echo h($portrait['title']); ?>
+                    </h5>
+
+                    <?php if (isset($portrait['location'])): ?>
+                      <p
+                        style="font-size: 14px; opacity: 0.9; margin: 8px 0 0; display: flex; align-items: center; gap: 6px;">
+                        <i class="bi bi-geo-alt-fill"></i>
+                        <?php echo h($portrait['location']); ?>
+                      </p>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+
+      <div class="text-center mt-5 pt-4">
+        <a href="portraits.php" class="btn-custom">
+          <i class="bi bi-images" style="font-size: 20px;"></i>
+          <span>View Full Gallery</span>
+          <i class="bi bi-arrow-right" style="font-size: 20px;"></i>
         </a>
       </div>
     </div>
   </section>
 
+  <!-- OPPORTUNITIES SECTION -->
+  <!-- OPPORTUNITIES SECTION -->
   <?php if (!empty($opportunities)): ?>
-    <section id="opportunities" class="py-5" style="background-color: var(--bg-light);">
-      
+    <section id="opportunities" class="py-5" style="background-color: #f8f9fa;">
       <div class="container">
         <div class="text-center mb-5">
-          <h2 class="fw-bold display-5" style="color: var(--text-primary);">Current Opportunities</h2>
+          <h2 class="fw-bold display-5" style="color: #494949;">Current Opportunities</h2>
           <p class="text-muted fs-5">Open positions and collaboration opportunities</p>
         </div>
-      </div>
-      <div class="container-fluid">
-          <div class="row justify-content-center">
-              <div class="col-12"> 
-                  <div class="swiper-container swiper-opportunities">
-                    <div class="swiper-wrapper">
-                      <?php foreach ($opportunities as $opp): ?>
-                        <div class="swiper-slide">
-                          <div class="card h-100 shadow-sm hover-card">
-                            <div class="card-body">
-                              <div class="d-flex justify-content-between align-items-start mb-3">
-                                <span class="badge bg-dark"><?php echo h($opp['job_type']); ?></span>
-                                <?php if ($opp['deadline']): ?>
-                                  <small class="text-muted"><i class="bi bi-clock"></i>
-                                    <?php echo date('M d', strtotime($opp['deadline'])); ?></small>
-                                <?php endif; ?>
-                              </div>
-                              <h5 class="card-title"><?php echo h($opp['title']); ?></h5>
-                              <?php if ($opp['location']): ?>
-                                <p class="text-muted small"><i class="bi bi-geo-alt"></i> <?php echo h($opp['location']); ?></p>
-                              <?php endif; ?>
-                              <p class="card-text"><?php echo h(substr($opp['description'], 0, 120)); ?>...</p>
-                              <button class="btn btn-outline-primary btn-sm w-100 mt-2"
-                                onclick="showApplicationForm(<?php echo $opp['opportunity_id']; ?>, '<?php echo h($opp['title']); ?>', '<?php echo h($opp['job_type']); ?>')">
-                                Apply Now
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      <?php endforeach; ?>
+
+        <div class="swiper swiper-opportunities">
+          <div class="swiper-wrapper">
+            <?php foreach ($opportunities as $opp): ?>
+              <div class="swiper-slide">
+                <div class="card h-100 shadow-sm hover-card">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                      <span class="badge bg-primary"><?php echo h($opp['job_type']); ?></span>
+                      <?php if ($opp['deadline']): ?>
+                        <small class="text-danger fw-bold">
+                          <i class="bi bi-clock"></i> Deadline: <?php echo date('M d, Y', strtotime($opp['deadline'])); ?>
+                        </small>
+                      <?php endif; ?>
                     </div>
 
-                    <div class="swiper-button-prev"></div>
-                    <div class="swiper-button-next"></div>
-                    <div class="swiper-pagination"></div>
+                    <h5 class="card-title fw-bold"><?php echo h($opp['title']); ?></h5>
 
+                    <?php if ($opp['location']): ?>
+                      <p class="text-muted small mb-2">
+                        <i class="bi bi-geo-alt-fill"></i> <?php echo h($opp['location']); ?>
+                      </p>
+                    <?php endif; ?>
+
+                    <?php if ($opp['net_rate']): ?>
+                      <p class="text-success small mb-2">
+                        <i class="bi bi-cash-stack"></i> <strong><?php echo h($opp['net_rate']); ?></strong>
+                      </p>
+                    <?php endif; ?>
+
+                    <?php if ($opp['job_type'] === 'talent'): ?>
+                      <div class="mb-3">
+                        <small class="d-block text-muted">
+                          <?php if ($opp['age_requirement']): ?>
+                            <span class="me-2"><i class="bi bi-person"></i> Age:
+                              <?php echo h($opp['age_requirement']); ?></span>
+                          <?php endif; ?>
+                          <?php if ($opp['height_requirement']): ?>
+                            <span class="me-2"><i class="bi bi-rulers"></i> Height:
+                              <?php echo h($opp['height_requirement']); ?></span>
+                          <?php endif; ?>
+                        </small>
+                        <small class="d-block text-muted">
+                          <?php if ($opp['gender_requirement'] && $opp['gender_requirement'] != 'any'): ?>
+                            <span class="me-2"><i class="bi bi-gender-ambiguous"></i>
+                              <?php echo ucfirst(h($opp['gender_requirement'])); ?></span>
+                          <?php endif; ?>
+                          <?php if ($opp['model_class']): ?>
+                            <span class="badge bg-primary">Class <?php echo h($opp['model_class']); ?></span>
+                          <?php endif; ?>
+                        </small>
+                      </div>
+                    <?php endif; ?>
+
+                    <p class="card-text small short-desc-<?php echo $opp['opportunity_id']; ?>">
+                      <?php echo h(substr($opp['description'], 0, 100)); ?>
+                      <?php echo strlen($opp['description']) > 100 ? '...' : ''; ?>
+                    </p>
+
+                    <?php if (strlen($opp['description']) > 100 || !empty($opp['requirements'])): ?>
+
+                      <div class="full-details-<?php echo $opp['opportunity_id']; ?>" style="display: none;">
+                        <?php if (strlen($opp['description']) > 100): ?>
+                          <div class="small mb-2">
+                            <strong>Full Description:</strong><br>
+                            <?php echo nl2br(h($opp['description'])); ?>
+                          </div>
+                        <?php endif; ?>
+
+                        <?php if (!empty($opp['requirements'])): ?>
+                          <div class="small mb-2">
+                            <strong>Requirements:</strong><br>
+                            <?php echo nl2br(h($opp['requirements'])); ?>
+                          </div>
+                        <?php endif; ?>
+                      </div>
+
+                      <button class="btn btn-link btn-sm p-0 mb-2 toggle-details-btn"
+                        data-opp-id="<?php echo $opp['opportunity_id']; ?>">
+                        <i class="bi bi-chevron-down icon-chevron"></i> <span class="btn-text">See More Details</span>
+                      </button>
+
+                    <?php endif; ?>
+
+                    <button class="btn btn-primary btn-sm w-100 mt-3"
+                      onclick="showApplicationForm(<?php echo $opp['opportunity_id']; ?>, '<?php echo addslashes(h($opp['title'])); ?>', '<?php echo h($opp['job_type']); ?>')">
+                      <i class="bi bi-send-fill"></i> Apply Now
+                    </button>
                   </div>
+                </div>
               </div>
+            <?php endforeach; ?>
           </div>
+          <div class="swiper-pagination"></div>
+          <div class="swiper-button-next"></div>
+          <div class="swiper-button-prev"></div>
+        </div>
       </div>
-      </section>
-<?php endif; ?>
+    </section>
+  <?php endif; ?>
 
+  <!-- APPLICATION MODAL -->
   <div class="modal fade" id="applicationModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
-        <form id="applicationForm" action="submit_application.php" method="POST">
+        <form id="applicationForm">
           <div class="modal-header">
             <h5 class="modal-title">Apply for: <span id="jobTitle"></span></h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -791,7 +1303,6 @@ try {
             </div>
 
             <div id="talentApplicationFields" style="display: none;">
-              <h6 class="mt-4 mb-3">Talent/Modeling Links</h6>
               <div class="mb-3">
                 <label for="setcard_link" class="form-label">Set Card Link *</label>
                 <input type="url" class="form-control" id="setcard_link" name="setcard_link"
@@ -807,7 +1318,6 @@ try {
             </div>
 
             <div id="vaApplicationFields" style="display: none;">
-              <h6 class="mt-4 mb-3">Resume/Portfolio Links</h6>
               <div class="mb-3">
                 <label for="resume_cv_link" class="form-label">Resume/CV Link *</label>
                 <input type="url" class="form-control" id="resume_cv_link" name="resume_cv_link"
@@ -821,12 +1331,6 @@ try {
               </div>
             </div>
 
-            <div class="mb-3">
-              <label for="cover_letter" class="form-label">Cover Letter *</label>
-              <textarea class="form-control" id="cover_letter" name="cover_letter" rows="4" required></textarea>
-            </div>
-
-
             <div id="formMessage"></div>
           </div>
           <div class="modal-footer">
@@ -838,144 +1342,7 @@ try {
     </div>
   </div>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            'primary-pink': '#cd919e',
-            'soft-pink': '#fef7f9',
-            'dark-text': '#1f2937',
-          },
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
-
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #f7f7f7;
-    }
-
-    .form-control {
-      border-radius: 0.5rem;
-      padding: 0.75rem 1rem;
-      border: 1px solid #e5e7eb;
-      transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-    }
-
-    .form-control:focus {
-      border-color: #cd919e;
-      box-shadow: 0 0 0 3px rgba(205, 145, 158, 0.25);
-      outline: none;
-    }
-
-    .swiper-pagination-bullet {
-      width: 10px;
-      height: 10px;
-      opacity: 1;
-      background: #d1d5db;
-      transition: background-color 0.3s;
-    }
-
-    .swiper-pagination-bullet-active {
-      background: #cd919e;
-      width: 12px;
-      height: 12px;
-    }
-
-    .testimonial-card {
-      border-radius: 1rem;
-      background-color: white;
-      transition: transform 0.3s ease-in-out;
-      border: 1px solid #f3f4f6;
-    }
-
-    .testimonial-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    }
-
-    .quote-icon svg {
-      color: #d1d5db;
-      opacity: 0.7;
-    }
-
-    .custom-testimonial-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 1050;
-      transition: opacity 0.3s ease;
-      opacity: 0;
-    }
-
-    .custom-testimonial-modal.open {
-      display: flex;
-      opacity: 1;
-    }
-
-    .custom-testimonial-modal .modal-content {
-      background: white;
-      border-radius: 1rem;
-      max-width: 90%;
-      width: 450px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-      animation: fadeIn 0.3s ease-out;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(-20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-  </style>
-
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-
-  <?php
-  // Fetch only NON-ARCHIVED and approved testimonials for display
-  $testimonials = [];
-  $db_error = null;
-
-  try {
-    $conn = getDBConnection();
-
-    $sql = "SELECT quote_text, client_name, client_title 
-              FROM testimonials 
-              WHERE is_approved = 1 AND is_archived = 0 
-              ORDER BY testimonial_id DESC";
-
-    $stmt = $conn->query($sql);
-    $testimonials = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-  } catch (PDOException $e) {
-    error_log("Testimonial Fetch Error: " . $e->getMessage());
-    $db_error = "We are currently unable to load testimonials due to a server issue.";
-  }
-
-  $has_testimonials = !empty($testimonials);
-  ?>
-
-  <!-- Testimonials Section -->
+  <!-- TESTIMONIALS SECTION -->
   <section id="testimonials" class="py-12 md:py-20">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12">
@@ -983,7 +1350,6 @@ try {
         <h2 class="mt-2 text-4xl font-extrabold tracking-tight sm:text-5xl">Feedbacks</h2>
         <p class="mt-4 text-xl text-gray-500">Real words from people I've worked with</p>
         <?php if (isset($db_error)): ?>
-          <!-- Display DB connection/query error if it occurred -->
           <p class="mt-4 text-red-600 font-medium bg-red-50 p-3 rounded-lg border border-red-200">
             <?php echo h($db_error); ?>
           </p>
@@ -1000,14 +1366,12 @@ try {
 
       <div class="swiper testimonialSwiper relative">
         <div id="swiperWrapper" class="swiper-wrapper">
-          <!-- Testimonial slides are rendered here by PHP from MySQL -->
           <?php if ($has_testimonials): ?>
             <?php foreach ($testimonials as $testimonial): ?>
               <div class="swiper-slide !h-auto">
                 <div class="testimonial-card h-full shadow-xl p-8 lg:p-12 text-center flex flex-col justify-between">
                   <div class="quote-content">
                     <div class="quote-icon mb-4 flex justify-center">
-                      <!-- Quote icon SVG for aesthetics -->
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-16 h-16 opacity-50" fill="none" viewBox="0 0 24 24"
                         stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1028,24 +1392,19 @@ try {
               </div>
             <?php endforeach; ?>
           <?php else: ?>
-            <!-- Fallback content if no approved testimonials are loaded -->
             <div class="swiper-slide p-6 flex justify-center items-center w-full">
               <div class="text-center text-gray-500 p-10 bg-white rounded-xl shadow-lg w-full max-w-lg">
                 <p class="text-lg">No approved testimonials found yet. Be the first to share your feedback!</p>
               </div>
             </div>
           <?php endif; ?>
-
         </div>
-        <!-- Add Pagination -->
         <div class="swiper-pagination mt-8"></div>
       </div>
     </div>
   </section>
 
-  <!-- REPLACE THE TESTIMONIAL MODAL SECTION IN index.php WITH THIS CODE -->
-
-  <!-- Modal for Testimonial Submission with CSRF Token -->
+  <!-- TESTIMONIAL MODAL -->
   <div id="testimonialModal" class="custom-testimonial-modal" tabindex="-1" aria-labelledby="testimonialModalLabel"
     aria-hidden="true" role="dialog">
     <div class="modal-content p-6">
@@ -1065,26 +1424,28 @@ try {
           the site.</p>
 
         <form id="testimonialForm">
-          <!-- CSRF Token Hidden Field -->
           <input type="hidden" name="csrf_token" value="<?php echo generateCSRFToken(); ?>">
 
           <div class="mb-4">
-            <label for="modal_client_name" class="block text-sm font-medium text-gray-700 mb-1">Your Name <span
-                class="text-red-500">*</span></label>
+            <label for="modal_client_name" class="block text-sm font-medium text-gray-700 mb-1">
+              Your Name <span class="text-red-500">*</span>
+            </label>
             <input type="text" class="form-control w-full" id="modal_client_name" name="client_name" required
               placeholder="E.g., Alex Johnson">
           </div>
 
           <div class="mb-4">
-            <label for="modal_client_title" class="block text-sm font-medium text-gray-700 mb-1">Your Role/Company
-              (Optional)</label>
+            <label for="modal_client_title" class="block text-sm font-medium text-gray-700 mb-1">
+              Your Role/Company (Optional)
+            </label>
             <input type="text" class="form-control w-full" id="modal_client_title" name="client_title"
               placeholder="E.g., CEO, Acme Corp.">
           </div>
 
           <div class="mb-6">
-            <label for="modal_quote_text" class="block text-sm font-medium text-gray-700 mb-1">Your Testimonial <span
-                class="text-red-500">*</span></label>
+            <label for="modal_quote_text" class="block text-sm font-medium text-gray-700 mb-1">
+              Your Testimonial <span class="text-red-500">*</span>
+            </label>
             <textarea class="form-control w-full" id="modal_quote_text" name="quote_text" rows="4" required
               placeholder="Write your feedback here..."></textarea>
           </div>
@@ -1104,159 +1465,35 @@ try {
     </div>
   </div>
 
-  <!-- JavaScript Setup for Swiper and AJAX Submission -->
-  <script>
-    let swiperInstance = null;
-    const form = document.getElementById('testimonialForm');
-    const submitBtn = document.getElementById('submitTestimonialBtn');
-    const messageBox = document.getElementById('submissionMessage');
-    // Ensure this matches the name of your PHP script
-    const submissionEndpoint = 'submit_testimonial.php';
-
-    // Initialize Swiper after the window loads and PHP has rendered the content
-    window.onload = function () {
-      // Count the slides rendered by PHP
-      const slides = document.querySelectorAll('#swiperWrapper .swiper-slide');
-      const numTestimonials = slides.length;
-
-      // Only initialize Swiper if there are slides
-      if (numTestimonials > 0) {
-        swiperInstance = new Swiper(".testimonialSwiper", {
-          slidesPerView: 1,
-          spaceBetween: 30,
-          // Enable looping only if there's more than one testimonial
-          loop: numTestimonials > 1,
-          centeredSlides: true,
-          pagination: {
-            el: ".swiper-pagination",
-            clickable: true,
-          },
-          autoplay: {
-            delay: 5000,
-            disableOnInteraction: false,
-          },
-          breakpoints: {
-            640: { slidesPerView: 1.2, spaceBetween: 20, },
-            1024: { slidesPerView: 2.2, spaceBetween: 30, },
-          }
-        });
-      }
-    };
-
-    // Handles the AJAX form submission to your PHP backend
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Submitting...';
-
-      const formData = new FormData(form);
-
-      try {
-        const response = await fetch(submissionEndpoint, {
-          method: 'POST',
-          body: formData,
-        });
-
-        // Expecting a JSON response from submit_testimonial.php
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          showMessage("success", result.message, 5000);
-          form.reset();
-          // Close modal and remind user about the manual approval step
-          setTimeout(() => closeModal('testimonialModal'), 1500);
-          setTimeout(() => showMessage("info", "Remember to refresh to see the change after approval.", 7000, 'bg-blue-100 text-blue-800'), 2000);
-        } else {
-          // Handle validation errors or database insertion errors from the PHP script
-          throw new Error(result.message || "Server error occurred.");
-        }
-
-      } catch (error) {
-        console.error("Error adding testimonial:", error);
-        showMessage("error", `Submission failed: ${error.message}`, 5000);
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Submit Feedback';
-      }
-    });
-
-    // Helper function for custom modal messages
-    function showMessage(type, text, duration = 3000, customClasses = null) {
-      messageBox.textContent = text;
-      messageBox.className = 'text-center p-3 rounded-lg';
-
-      if (customClasses) {
-        messageBox.classList.add(...customClasses.split(' '));
-      } else if (type === "success") {
-        messageBox.classList.add('bg-green-100', 'text-green-800');
-      } else if (type === "error") {
-        messageBox.classList.add('bg-red-100', 'text-red-800');
-      } else {
-        // info/default
-        messageBox.classList.add('bg-gray-100', 'text-gray-700');
-      }
-
-      messageBox.classList.remove('hidden');
-
-      clearTimeout(window.messageTimeout);
-      window.messageTimeout = setTimeout(() => {
-        messageBox.classList.add('hidden');
-      }, duration);
-    }
-
-    // Modal control functions
-    window.openModal = function (id) {
-      document.getElementById(id).classList.add('open');
-      document.body.style.overflow = 'hidden';
-      messageBox.classList.add('hidden');
-      form.reset();
-    }
-
-    window.closeModal = function (id) {
-      document.getElementById(id).classList.remove('open');
-      document.body.style.overflow = '';
-    }
-  </script>
-
   <?php include 'footer.php'; ?>
 
-
+  <!-- JAVASCRIPT LIBRARIES -->
   <script src="js/jquery-1.11.0.min.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-  <script src="https://cdn.jsdelivr.net/npm/swiper@10/swiper-bundle.min.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script src="js/plugins.js"></script>
-
   <script src="js/script.js"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
   <script>
-    // Replace the entire script section at the bottom of your index.php with this:
-
-    // Helper function to get the Bootstrap Modal instance
+    // UTILITY FUNCTIONS
     const getBsModal = (id) => {
       const el = document.getElementById(id);
       if (!el) return null;
       return bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
     };
 
-    // --- 1. Inquiry Form SweetAlert Logic ---
+    // INQUIRY FORM HANDLER
     const inquiryForm = document.getElementById('inquiryForm');
-
     if (inquiryForm) {
       inquiryForm.addEventListener('submit', function (e) {
         e.preventDefault();
-        const form = e.target;
-        const formData = new FormData(form);
+        const formData = new FormData(this);
         const submitBtn = document.getElementById('submitBtn');
-        const originalBtnText = submitBtn ? submitBtn.innerHTML : 'Send Inquiry';
+        const originalBtnText = submitBtn?.innerHTML || 'Send Inquiry';
 
         if (submitBtn) {
           submitBtn.disabled = true;
-          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
         }
 
         fetch('submit_inquiry.php', {
@@ -1275,7 +1512,7 @@ try {
               confirmButtonColor: '#cd919e'
             });
 
-            if (data.success) form.reset();
+            if (data.success) this.reset();
           })
           .catch(error => {
             console.error('Inquiry Submission Error:', error);
@@ -1298,10 +1535,8 @@ try {
       });
     }
 
-    // --- 2. Testimonial Modal Functions (Custom, NOT Bootstrap) ---
-    // These are ONLY for the testimonialModal which uses custom styling
+    // TESTIMONIAL MODAL CONTROLS
     window.openModal = function (id) {
-      // Only handle the custom testimonialModal
       if (id === 'testimonialModal') {
         document.getElementById(id).classList.add('open');
         document.body.style.overflow = 'hidden';
@@ -1310,30 +1545,27 @@ try {
         const form = document.getElementById('testimonialForm');
         if (form) form.reset();
       }
-    }
+    };
 
     window.closeModal = function (id) {
-      // Only handle the custom testimonialModal
       if (id === 'testimonialModal') {
         document.getElementById(id).classList.remove('open');
         document.body.style.overflow = '';
       }
-    }
+    };
 
-    // --- 3. Testimonial Form Submission (Separate from inquiry) ---
+    // TESTIMONIAL FORM HANDLER
     const testimonialForm = document.getElementById('testimonialForm');
-
     if (testimonialForm) {
       testimonialForm.addEventListener('submit', function (e) {
         e.preventDefault();
-        const form = e.target;
-        const formData = new FormData(form);
+        const formData = new FormData(this);
         const submitBtn = document.getElementById('submitTestimonialBtn');
-        const originalBtnText = submitBtn ? submitBtn.innerHTML : 'Submit Feedback';
+        const originalBtnText = submitBtn?.innerHTML || 'Submit Feedback';
 
         if (submitBtn) {
           submitBtn.disabled = true;
-          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...';
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
         }
 
         fetch('submit_testimonial.php', {
@@ -1351,7 +1583,7 @@ try {
               confirmButtonColor: '#cd919e'
             });
 
-            if (data.success) form.reset();
+            if (data.success) this.reset();
           })
           .catch(error => {
             console.error('Testimonial Submission Error:', error);
@@ -1373,8 +1605,170 @@ try {
       });
     }
 
-    // --- 4. Swiper Initializations ---
-    var mainBannerSwiper = new Swiper(".main-banner", {
+    // CV FUNCTIONALITY
+    document.addEventListener('DOMContentLoaded', function () {
+      const previewModal = new bootstrap.Modal(document.getElementById('cvPreviewModal'));
+      const passwordModal = new bootstrap.Modal(document.getElementById('cvPasswordModal'));
+
+      // Preview CV
+      document.querySelectorAll('.preview-cv').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const path = this.dataset.cvPath;
+          const title = this.dataset.cvTitle;
+          const url = window.location.origin + '/' + path;
+          const fileExt = path.split('.').pop().toLowerCase();
+
+          document.getElementById('previewTitle').textContent = title;
+
+          if (fileExt === 'pdf') {
+            document.getElementById('previewContainer').innerHTML = `<embed src="${url}" type="application/pdf" width="100%" height="100%">`;
+          } else if (fileExt === 'doc' || fileExt === 'docx') {
+            document.getElementById('previewContainer').innerHTML = `<iframe src="https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}" style="width:100%; height:100%; border:none;"></iframe>`;
+          } else {
+            document.getElementById('previewContainer').innerHTML = `<iframe src="${url}" style="width:100%; height:100%; border:none;"></iframe>`;
+          }
+
+          previewModal.show();
+        });
+      });
+
+      // Download CV
+      document.querySelectorAll('.download-cv').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const cvId = this.dataset.cvId;
+          const hasPassword = this.dataset.hasPassword == '1';
+
+          if (hasPassword) {
+            document.getElementById('passwordCvId').value = cvId;
+            document.getElementById('cvPasswordInput').value = '';
+            document.getElementById('cvPasswordInput').classList.remove('is-invalid');
+            document.getElementById('pwdError').classList.add('d-none');
+            passwordModal.show();
+          } else {
+            window.location.href = `download_cv.php?id=${cvId}`;
+          }
+        });
+      });
+
+      // Password form submit
+      document.getElementById('cvPasswordForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Verifying...';
+
+        try {
+          const response = await fetch('download_cv.php', {
+            method: 'POST',
+            body: formData
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            passwordModal.hide();
+            window.location.href = result.download_url;
+          } else {
+            document.getElementById('cvPasswordInput').classList.add('is-invalid');
+            document.getElementById('pwdError').classList.remove('d-none');
+          }
+        } catch (error) {
+          alert('An error occurred. Please try again.');
+        }
+
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+      });
+
+      // Toggle password visibility
+      document.getElementById('togglePwd').addEventListener('click', function () {
+        const input = document.getElementById('cvPasswordInput');
+        const icon = this.querySelector('i');
+
+        if (input.type === 'password') {
+          input.type = 'text';
+          icon.className = 'bi bi-eye-slash';
+        } else {
+          input.type = 'password';
+          icon.className = 'bi bi-eye';
+        }
+      });
+
+      // Clear error on input
+      document.getElementById('cvPasswordInput').addEventListener('input', function () {
+        this.classList.remove('is-invalid');
+        document.getElementById('pwdError').classList.add('d-none');
+      });
+    });
+
+    // APPLICATION FORM HANDLER
+    window.showApplicationForm = function (opportunityId, jobTitle, jobType) {
+      document.getElementById('opportunity_id').value = opportunityId;
+      document.getElementById('jobTitle').textContent = jobTitle;
+      document.getElementById('application_job_type').value = jobType;
+      document.getElementById('applicationForm').reset();
+      document.getElementById('formMessage').innerHTML = '';
+
+      const talentFields = document.getElementById('talentApplicationFields');
+      const vaFields = document.getElementById('vaApplicationFields');
+      const setcardLink = document.getElementById('setcard_link');
+      const resumeLink = document.getElementById('resume_cv_link');
+
+      talentFields.style.display = 'none';
+      vaFields.style.display = 'none';
+      setcardLink.required = false;
+      resumeLink.required = false;
+
+      const talentJobTypes = ['talent', 'brand-ambassador', 'usherette'];
+      const isTalent = talentJobTypes.includes(jobType.toLowerCase());
+
+      if (isTalent) {
+        talentFields.style.display = 'block';
+        setcardLink.required = true;
+      } else {
+        vaFields.style.display = 'block';
+        resumeLink.required = true;
+      }
+
+      const modal = new bootstrap.Modal(document.getElementById('applicationModal'));
+      modal.show();
+    };
+
+    document.getElementById('applicationForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const messageDiv = document.getElementById('formMessage');
+
+      fetch('submit_application.php', {
+        method: 'POST',
+        body: formData
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            messageDiv.innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
+            this.reset();
+            setTimeout(() => {
+              const modalElement = document.getElementById('applicationModal');
+              const modalInstance = bootstrap.Modal.getInstance(modalElement);
+              if (modalInstance) modalInstance.hide();
+            }, 2000);
+          } else {
+            messageDiv.innerHTML = '<div class="alert alert-danger">' + data.message + '</div>';
+          }
+        })
+        .catch(error => {
+          messageDiv.innerHTML = '<div class="alert alert-danger">An error occurred. Please try again.</div>';
+        });
+    });
+
+    // SWIPER INITIALIZATIONS
+    // Main Banner Swiper
+    const mainBannerSwiper = new Swiper(".main-banner", {
       loop: true,
       autoplay: {
         delay: 1000,
@@ -1391,7 +1785,8 @@ try {
       pagination: false
     });
 
-    var testimonialSwiper = new Swiper(".testimonialSwiper", {
+    // Testimonial Swiper
+    const testimonialSwiper = new Swiper(".testimonialSwiper", {
       loop: true,
       grabCursor: true,
       autoplay: {
@@ -1403,137 +1798,196 @@ try {
         clickable: true,
       },
       breakpoints: {
-        0: {
-          slidesPerView: 1,
-          spaceBetween: 20
+        0: { slidesPerView: 1, spaceBetween: 20 },
+        768: { slidesPerView: 2, spaceBetween: 30 },
+        992: { slidesPerView: 3, spaceBetween: 40 }
+      }
+    });
+    // OPPORTUNITIES TOGGLE DETAILS
+    document.querySelectorAll('.toggle-details-btn').forEach(btn => {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        const oppId = this.dataset.oppId;
+        const fullDetails = document.querySelector('.full-details-' + oppId);
+        const shortDesc = document.querySelector('.short-desc-' + oppId);
+        const btnText = this.querySelector('.btn-text');
+
+        if (fullDetails.style.display === 'none') {
+          fullDetails.style.display = 'block';
+          shortDesc.style.display = 'none';
+          btnText.textContent = 'See Less';
+          this.classList.add('active');
+        } else {
+          fullDetails.style.display = 'none';
+          shortDesc.style.display = 'block';
+          btnText.textContent = 'See More Details';
+          this.classList.remove('active');
+        }
+      });
+    });
+    // OPPORTUNITIES SWIPER
+    const opportunitiesSwiper = new Swiper('.swiper-opportunities', {
+      direction: 'horizontal',
+      loop: false,
+      slidesPerView: 1,
+      spaceBetween: 20,
+      autoHeight: true,
+      observer: true,
+      observeParents: true,
+      observeSlideChildren: true,
+      pagination: {
+        el: '.swiper-pagination',
+        clickable: true,
+      },
+      navigation: {
+        nextEl: '.swiper-button-next',
+        prevEl: '.swiper-button-prev',
+      },
+      breakpoints: {
+        768: { slidesPerView: 2, spaceBetween: 30 },
+        992: { slidesPerView: 3, spaceBetween: 40 }
+      },
+      on: {
+        init: function () {
+          // Attach toggle listeners after swiper initializes
+          attachToggleListeners();
         },
-        768: {
-          slidesPerView: 2,
-          spaceBetween: 30
-        },
-        992: {
-          slidesPerView: 5,
-          spaceBetween: 10
+        slideChange: function () {
+          // Re-attach listeners when slide changes
+          attachToggleListeners();
         }
       }
     });
-    // Initialize Swiper after the DOM is loaded
-    // Initialize Swiper after the DOM is loaded
-    document.addEventListener('DOMContentLoaded', function () {
-      const swiper = new Swiper('.swiper-opportunities', {
-        // Core Settings
-        direction: 'horizontal',
-        loop: false,
-        // Enable touch swipe on all devices
-        simulateTouch: true,
-        grabCursor: true,
 
-        // Default: 1 slide per view on mobile
-        slidesPerView: 1,
-        spaceBetween: 20,
-
-        // Pagination (dots)
-        pagination: {
-          el: '.swiper-pagination',
-          clickable: true,
-        },
-
-        // Navigation arrows
-        navigation: {
-          nextEl: '.swiper-button-next',
-          prevEl: '.swiper-button-prev',
-        },
-
-        // Responsive breakpoints
-        breakpoints: {
-          // Tablet/Small Desktop
-          768: {
-            slidesPerView: 2,
-            spaceBetween: 30
-          },
-          // Large Desktop
-          992: {
-            slidesPerView: 3,
-            spaceBetween: 40
-          }
-        },
+    // OPPORTUNITIES TOGGLE DETAILS FUNCTION
+    function attachToggleListeners() {
+      document.querySelectorAll('.toggle-details-btn').forEach(btn => {
+        // Remove old listener first
+        btn.replaceWith(btn.cloneNode(true));
       });
-    });
 
-    function showApplicationForm(opportunityId, jobTitle, jobType) {
-      // 1. Set general data
-      document.getElementById('opportunity_id').value = opportunityId;
-      document.getElementById('jobTitle').textContent = jobTitle;
-      document.getElementById('application_job_type').value = jobType;
+      // Add new listeners
+      document.querySelectorAll('.toggle-details-btn').forEach(btn => {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
 
-      // 2. Reset form and messages
-      document.getElementById('applicationForm').reset();
-      document.getElementById('formMessage').innerHTML = '';
+          const oppId = this.dataset.oppId;
+          const fullDetails = document.querySelector('.full-details-' + oppId);
+          const shortDesc = document.querySelector('.short-desc-' + oppId);
+          const btnText = this.querySelector('.btn-text');
 
-      // 3. Select field containers and required inputs
-      const talentFields = document.getElementById('talentApplicationFields');
-      const vaFields = document.getElementById('vaApplicationFields');
-      const setcardLink = document.getElementById('setcard_link');
-      const resumeLink = document.getElementById('resume_cv_link');
+          console.log('Toggling opportunity:', oppId); // Debug
 
-      // 4. Reset display and 'required' state for all custom fields
-      talentFields.style.display = 'none';
-      vaFields.style.display = 'none';
-      setcardLink.required = false;
-      resumeLink.required = false;
+          if (fullDetails && shortDesc) {
+            if (fullDetails.style.display === 'none' || fullDetails.style.display === '') {
+              fullDetails.style.display = 'block';
+              shortDesc.style.display = 'none';
+              btnText.textContent = 'See Less';
+              this.classList.add('active');
+            } else {
+              fullDetails.style.display = 'none';
+              shortDesc.style.display = 'block';
+              btnText.textContent = 'See More Details';
+              this.classList.remove('active');
+            }
 
-      // 5. Define talent job types and check condition
-      const talentJobTypes = ['talent', 'brand-ambassador', 'usherette']; // Array for robust checking
-      const isTalent = talentJobTypes.includes(jobType.toLowerCase());
-
-      // 6. Conditionally show the correct fields and set their 'required' attribute
-      if (isTalent) {
-        // Show talent fields and require setcard
-        talentFields.style.display = 'block';
-        setcardLink.required = true;
-      } else {
-        // Show VA fields (for VA, Virtual Assistant, or any other type) and require resume
-        vaFields.style.display = 'block';
-        resumeLink.required = true;
-      }
-
-      // 7. Show the modal
-      var modal = new bootstrap.Modal(document.getElementById('applicationModal'));
-      modal.show();
+            // Update swiper height
+            setTimeout(() => {
+              opportunitiesSwiper.updateAutoHeight(300);
+              opportunitiesSwiper.update();
+            }, 50);
+          }
+        });
+      });
     }
 
-    // Handle form submission (keep this as is)
-    document.getElementById('applicationForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-
-      const formData = new FormData(this);
-      const messageDiv = document.getElementById('formMessage');
-
-      fetch('submit_application.php', {
-        method: 'POST',
-        body: formData
-      })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            messageDiv.innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
-            this.reset();
-            setTimeout(() => {
-              // Correct way to get and hide the modal instance
-              const modalElement = document.getElementById('applicationModal');
-              const modalInstance = bootstrap.Modal.getInstance(modalElement);
-              if (modalInstance) {
-                modalInstance.hide();
-              }
-            }, 2000);
-          } else {
-            messageDiv.innerHTML = '<div class="alert alert-danger">' + data.message + '</div>';
-          }
-        })
-        .catch(error => {
-          messageDiv.innerHTML = '<div class="alert alert-danger">An error occurred. Please try again.</div>';
-        });
+    // Initialize toggle listeners on page load
+    document.addEventListener('DOMContentLoaded', function () {
+      attachToggleListeners();
     });
+
+    // SCROLL TO OPPORTUNITIES FUNCTION
+    window.scrollToOpportunities = function() {
+      const opportunitiesSection = document.getElementById('opportunities');
+      if (opportunitiesSection) {
+        opportunitiesSection.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    };
+
+    // MINIMIZE ANNOUNCEMENT FUNCTION
+    window.minimizeAnnouncement = function(event) {
+      event.stopPropagation(); // Prevent triggering the scroll function
+      const widget = document.getElementById('announcementWidget');
+      if (widget) {
+        widget.classList.add('minimized');
+        // Store in localStorage so it stays minimized on page refresh
+        localStorage.setItem('announcementMinimized', 'true');
+      }
+    };
+
+    // EXPAND ANNOUNCEMENT FUNCTION
+    window.expandAnnouncement = function(event) {
+      event.stopPropagation(); // Prevent triggering the scroll function
+      const widget = document.getElementById('announcementWidget');
+      if (widget) {
+        widget.classList.remove('minimized');
+        // Remove from localStorage so it stays expanded
+        localStorage.removeItem('announcementMinimized');
+      }
+    };
+
+    // CHECK IF ANNOUNCEMENT WAS PREVIOUSLY MINIMIZED
+    document.addEventListener('DOMContentLoaded', function() {
+      const isMinimized = localStorage.getItem('announcementMinimized');
+      const widget = document.getElementById('announcementWidget');
+      
+      if (isMinimized === 'true' && widget) {
+        widget.classList.add('minimized');
+      }
+    });
+
+    // Event Cards Intersection Observer
+    const eventCards = document.querySelectorAll('.event-card');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+        }
+      });
+    }, {
+      threshold: 0.1,
+      rootMargin: '0px 0px -100px 0px'
+    });
+
+    eventCards.forEach(card => {
+      observer.observe(card);
+    });
+
+    // TOGGLE FUNCTION
+    function toggleOppDetails(oppId, btn) {
+      const fullDetails = document.querySelector('.full-details-' + oppId);
+      const shortDesc = document.querySelector('.short-desc-' + oppId);
+      const btnText = btn.querySelector('.btn-text');
+
+      if (fullDetails.style.display === 'none' || fullDetails.style.display === '') {
+        fullDetails.style.display = 'block';
+        shortDesc.style.display = 'none';
+        btnText.textContent = 'See Less';
+        btn.classList.add('active');
+      } else {
+        fullDetails.style.display = 'none';
+        shortDesc.style.display = 'block';
+        btnText.textContent = 'See More Details';
+        btn.classList.remove('active');
+      }
+
+      // Remove the setTimeout that was updating height
+    }
   </script>
 </body>
 
