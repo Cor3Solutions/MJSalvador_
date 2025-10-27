@@ -46,9 +46,9 @@ try {
   $stmt = $conn->prepare("SELECT * FROM portraits WHERE is_archived = 0 ORDER BY portrait_id DESC LIMIT 3");
   $stmt->execute();
   $portraits = $stmt->fetchAll(PDO::FETCH_ASSOC);
-  
+
   // Fetch active opportunities
-  $stmt = $conn->prepare("SELECT * FROM opportunities WHERE is_active = 1 AND is_archived = 0 ORDER BY opportunity_id DESC");
+  $stmt = $conn->prepare("SELECT * FROM opportunities WHERE is_active = 1 AND is_archived = 0 ORDER BY opportunity_id DESC LIMIT 3");
   $stmt->execute();
   $opportunities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -632,7 +632,8 @@ $has_testimonials = !empty($testimonials);
         padding-right: 0;
         /* ... (rest of the mobile card sizing) ... */
       }
-    } 
+    }
+
     /* ANNOUNCEMENT WIDGET */
     .announcement-widget {
       position: fixed;
@@ -753,15 +754,36 @@ $has_testimonials = !empty($testimonials);
     }
 
     @keyframes pulse {
-      0% { box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
-      50% { box-shadow: 0 8px 25px rgba(205, 145, 158, 0.3); }
-      100% { box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); }
+      0% {
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      }
+
+      50% {
+        box-shadow: 0 8px 25px rgba(205, 145, 158, 0.3);
+      }
+
+      100% {
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+      }
     }
 
     @keyframes bounce {
-      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
-      40% { transform: translateY(-3px); }
-      60% { transform: translateY(-2px); }
+
+      0%,
+      20%,
+      50%,
+      80%,
+      100% {
+        transform: translateY(0);
+      }
+
+      40% {
+        transform: translateY(-3px);
+      }
+
+      60% {
+        transform: translateY(-2px);
+      }
     }
 
     /* Mobile responsive adjustments */
@@ -1257,7 +1279,6 @@ $has_testimonials = !empty($testimonials);
   </section>
 
   <!-- OPPORTUNITIES SECTION -->
-  <!-- OPPORTUNITIES SECTION -->
   <?php if (!empty($opportunities)): ?>
     <section id="opportunities" class="py-5" style="background-color: #f8f9fa;">
       <div class="container">
@@ -1358,11 +1379,14 @@ $has_testimonials = !empty($testimonials);
               </div>
             <?php endforeach; ?>
           </div>
-          <div class="swiper-pagination"></div>
-          <div class="swiper-button-next"></div>
-          <div class="swiper-button-prev"></div>
         </div>
-      </div>
+
+         <div class="text-center mt-4">
+          <a href="opportunities.php" class="btn btn-outline-primary btn-lg">
+            See All Opportunities
+          </a>
+        </div>
+       </div>
     </section>
   <?php endif; ?>
 
@@ -1709,12 +1733,12 @@ $has_testimonials = !empty($testimonials);
           // Remove existing listeners to prevent duplicates
           btn.replaceWith(btn.cloneNode(true));
         });
-        
+
         document.querySelectorAll('.preview-cv').forEach(btn => {
           btn.addEventListener('click', function () {
             const path = this.dataset.cvPath;
             const title = this.dataset.cvTitle;
-            
+
             // Construct proper URL for XAMPP/localhost setup
             let url;
             if (path.startsWith('http')) {
@@ -1726,9 +1750,9 @@ $has_testimonials = !empty($testimonials);
               const projectRoot = currentPath.substring(0, currentPath.lastIndexOf('/'));
               url = window.location.origin + projectRoot + '/' + path;
             }
-            
+
             const fileExt = path.split('.').pop().toLowerCase();
-            
+
             // Debug: Log the constructed URL
             console.log('CV Preview Debug:', {
               originalPath: path,
@@ -1737,7 +1761,7 @@ $has_testimonials = !empty($testimonials);
             });
 
             document.getElementById('previewTitle').textContent = title;
-            
+
             // Test if file is accessible before showing preview
             fetch(url, { method: 'HEAD' })
               .then(response => {
@@ -1750,7 +1774,7 @@ $has_testimonials = !empty($testimonials);
                 console.error('File access error:', error);
                 showErrorFallback();
               });
-            
+
             function showPreview() {
               // Show loading state
               document.getElementById('previewContainer').innerHTML = `
@@ -1765,8 +1789,8 @@ $has_testimonials = !empty($testimonials);
               `;
 
               if (fileExt === 'pdf') {
-              // Create PDF viewer with fallback options
-              const pdfViewer = `
+                // Create PDF viewer with fallback options
+                const pdfViewer = `
                 <div class="h-100 position-relative">
                   <embed id="pdfEmbed" 
                          src="${url}#toolbar=1&navpanes=1&scrollbar=1&view=FitH" 
@@ -1791,17 +1815,17 @@ $has_testimonials = !empty($testimonials);
                   </div>
                 </div>
               `;
-              document.getElementById('previewContainer').innerHTML = pdfViewer;
-              
-              // Set a timeout to show fallback if PDF doesn't load within 5 seconds
-              setTimeout(() => {
-                const embed = document.getElementById('pdfEmbed');
-                if (embed && !embed.complete) {
-                  showPdfFallback(url);
-                }
-              }, 5000);
-            } else if (fileExt === 'doc' || fileExt === 'docx') {
-              document.getElementById('previewContainer').innerHTML = `
+                document.getElementById('previewContainer').innerHTML = pdfViewer;
+
+                // Set a timeout to show fallback if PDF doesn't load within 5 seconds
+                setTimeout(() => {
+                  const embed = document.getElementById('pdfEmbed');
+                  if (embed && !embed.complete) {
+                    showPdfFallback(url);
+                  }
+                }, 5000);
+              } else if (fileExt === 'doc' || fileExt === 'docx') {
+                document.getElementById('previewContainer').innerHTML = `
                 <div class="h-100 d-flex flex-column justify-content-center align-items-center">
                   <div class="alert alert-info mb-3">
                     <i class="bi bi-info-circle me-2"></i>
@@ -1814,8 +1838,8 @@ $has_testimonials = !empty($testimonials);
                   </div>
                 </div>
               `;
-            } else {
-              document.getElementById('previewContainer').innerHTML = `
+              } else {
+                document.getElementById('previewContainer').innerHTML = `
                 <div class="h-100 d-flex flex-column justify-content-center align-items-center">
                   <div class="alert alert-warning mb-3">
                     <i class="bi bi-exclamation-triangle me-2"></i>
@@ -1828,11 +1852,11 @@ $has_testimonials = !empty($testimonials);
                   </div>
                 </div>
               `;
+              }
+
+              previewModal.show();
             }
 
-            previewModal.show();
-            }
-            
             function showErrorFallback() {
               document.getElementById('previewContainer').innerHTML = `
                 <div class="h-100 d-flex flex-column justify-content-center align-items-center">
@@ -1863,7 +1887,7 @@ $has_testimonials = !empty($testimonials);
       attachPreviewListeners();
 
       // Helper functions for PDF preview
-      window.showPdfFallback = function(url) {
+      window.showPdfFallback = function (url) {
         const fallback = document.getElementById('pdfFallback');
         if (fallback) {
           fallback.classList.remove('d-none');
@@ -1877,7 +1901,7 @@ $has_testimonials = !empty($testimonials);
         hideLoading();
       };
 
-      window.hideLoading = function() {
+      window.hideLoading = function () {
         const loadingElement = document.querySelector('.spinner-border');
         if (loadingElement) {
           loadingElement.parentElement.parentElement.remove();
@@ -1890,7 +1914,7 @@ $has_testimonials = !empty($testimonials);
           // Remove existing listeners to prevent duplicates
           btn.replaceWith(btn.cloneNode(true));
         });
-        
+
         document.querySelectorAll('.download-cv').forEach(btn => {
           btn.addEventListener('click', function () {
             const cvId = this.dataset.cvId;
@@ -2083,11 +2107,11 @@ $has_testimonials = !empty($testimonials);
         768: { slidesPerView: 1, spaceBetween: 0 }
       },
       on: {
-        init: function() {
+        init: function () {
           // Ensure all slides have same height
           this.updateAutoHeight();
         },
-        slideChange: function() {
+        slideChange: function () {
           this.updateAutoHeight();
         }
       }
@@ -2197,7 +2221,7 @@ $has_testimonials = !empty($testimonials);
     });
 
     // SCROLL TO OPPORTUNITIES FUNCTION
-    window.scrollToOpportunities = function() {
+    window.scrollToOpportunities = function () {
       const opportunitiesSection = document.getElementById('opportunities');
       if (opportunitiesSection) {
         opportunitiesSection.scrollIntoView({
@@ -2208,7 +2232,7 @@ $has_testimonials = !empty($testimonials);
     };
 
     // MINIMIZE ANNOUNCEMENT FUNCTION
-    window.minimizeAnnouncement = function(event) {
+    window.minimizeAnnouncement = function (event) {
       event.stopPropagation(); // Prevent triggering the scroll function
       const widget = document.getElementById('announcementWidget');
       if (widget) {
@@ -2219,7 +2243,7 @@ $has_testimonials = !empty($testimonials);
     };
 
     // EXPAND ANNOUNCEMENT FUNCTION
-    window.expandAnnouncement = function(event) {
+    window.expandAnnouncement = function (event) {
       event.stopPropagation(); // Prevent triggering the scroll function
       const widget = document.getElementById('announcementWidget');
       if (widget) {
@@ -2230,10 +2254,10 @@ $has_testimonials = !empty($testimonials);
     };
 
     // CHECK IF ANNOUNCEMENT WAS PREVIOUSLY MINIMIZED
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
       const isMinimized = localStorage.getItem('announcementMinimized');
       const widget = document.getElementById('announcementWidget');
-      
+
       if (isMinimized === 'true' && widget) {
         widget.classList.add('minimized');
       }

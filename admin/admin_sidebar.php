@@ -88,6 +88,13 @@ if (isset($conn)) {
                     <i class="bi bi-megaphone"></i> <span>Applications</span>
                 </a>
             </li>
+
+            <li class="nav-item">
+                <a class="nav-link <?php echo is_active('manage_models.php'); ?>" href="manage_models.php">
+                    <i class="bi bi-people"></i> <span>Careers</span>
+                </a>
+            </li>
+
             <h6 class="sidebar-heading">
                 <span>System</span>
             </h6>
