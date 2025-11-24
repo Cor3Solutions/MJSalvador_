@@ -122,8 +122,8 @@ $has_testimonials = !empty($testimonials);
   <style>
     /* CSS VARIABLES */
     :root {
-      --jade-primary: #4CAF50;
-      --jade-primary-hover: #45a049;
+      --jade-primary: #cd919e;
+      --jade-primary-hover: #d68a9bff;
       --text-primary: #333;
       --bg-light: #f8f9fa;
       --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);

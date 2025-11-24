@@ -488,7 +488,7 @@ try {
                             <div class="col-md-6 mb-3">
                                 <label for="model_name" class="form-label">Model Name *</label>
                                 <input type="text" class="form-control" id="model_name" name="model_name" required 
-                                       placeholder="e.g., Jane Doe">
+                                       placeholder="e.g., Leanne Frank">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="category" class="form-label">Category *</label>
@@ -507,7 +507,7 @@ try {
                             <div class="col-md-6 mb-3">
                                 <label for="brand" class="form-label">Brand</label>
                                 <input type="text" class="form-control" id="brand" name="brand" 
-                                       placeholder="e.g., Coca-Cola">
+                                       placeholder="e.g., Adidas">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="event_name" class="form-label">Event Name</label>

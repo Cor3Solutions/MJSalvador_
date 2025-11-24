@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
-require_once 'includes/archive_functions.php'; // ADDED: Required for archiving
+require_once 'includes/archive_functions.php';
+require_once 'includes/email_functions.php'; // ADDED: For email notifications
 
 if (!function_exists('h')) {
     function h($text) {
@@ -36,22 +37,56 @@ $filter_opportunity = isset($_GET['opportunity_id']) ? (int)$_GET['opportunity_i
 try {
     $conn = getDBConnection();
 
-    // Handle status update
+    // Handle status update with email notification
     if (isset($_GET['action']) && $_GET['action'] == 'update_status' && isset($_GET['id']) && isset($_GET['status'])) {
         $app_id = (int)$_GET['id'];
-        $status = $_GET['status'];
+        $new_status = $_GET['status'];
         $allowed_statuses = ['pending', 'reviewed', 'shortlisted', 'rejected'];
         
-        if (in_array($status, $allowed_statuses)) {
-            $stmt = $conn->prepare("UPDATE applications SET status = :status, is_reviewed = 1 WHERE application_id = :id AND is_archived = 0");
-            $stmt->execute([':status' => $status, ':id' => $app_id]);
-            $success = 'Application status updated successfully!';
+        if (in_array($new_status, $allowed_statuses)) {
+            // Get application details before update
+            $stmt = $conn->prepare("
+                SELECT a.*, o.title as job_title, o.job_type 
+                FROM applications a 
+                JOIN opportunities o ON a.opportunity_id = o.opportunity_id 
+                WHERE a.application_id = :id
+            ");
+            $stmt->execute([':id' => $app_id]);
+            $app_details = $stmt->fetch();
+            
+            if ($app_details) {
+                $old_status = $app_details['status'];
+                
+                // Update the status
+                $updateStmt = $conn->prepare("UPDATE applications SET status = :status, is_reviewed = 1 WHERE application_id = :id AND is_archived = 0");
+                $updateStmt->execute([':status' => $new_status, ':id' => $app_id]);
+                
+                // Send email notification if status actually changed
+                if ($old_status !== $new_status) {
+                    $email_sent = sendApplicationStatusEmail(
+                        $app_details['email'],
+                        $app_details['full_name'],
+                        $app_details['job_title'],
+                        $new_status,
+                        $app_details
+                    );
+                    
+                    if ($email_sent) {
+                        $success = 'Application status updated and email notification sent! 📧';
+                    } else {
+                        $success = 'Application status updated, but email notification failed to send.';
+                    }
+                } else {
+                    $success = 'Application status updated successfully!';
+                }
+            }
+            
             header('Location: view_applications.php' . ($filter_opportunity > 0 ? '?opportunity_id=' . $filter_opportunity : '') . '&success=' . urlencode($success));
             exit;
         }
     }
 
-    // ADDED: Handle archive action
+    // Handle archive action
     if (isset($_GET['action']) && $_GET['action'] == 'archive' && isset($_GET['id'])) {
         $app_id = filter_var($_GET['id'], FILTER_VALIDATE_INT);
         if ($app_id !== false) {
@@ -72,7 +107,7 @@ try {
         $success = h($_GET['success']);
     }
 
-    // FIXED: Fetch only non-archived applications
+    // Fetch only non-archived applications
     $sql = "
         SELECT a.*, o.title as job_title, o.job_type 
         FROM applications a 
@@ -92,11 +127,11 @@ try {
     $stmt->execute($params);
     $applications = $stmt->fetchAll();
 
-    // FIXED: Get only non-archived opportunities
+    // Get only non-archived opportunities
     $stmt = $conn->query("SELECT opportunity_id, title FROM opportunities WHERE is_archived = 0 ORDER BY created_date DESC");
     $opportunities = $stmt->fetchAll();
 
-    // FIXED: Get application statistics - only for non-archived applications AND non-archived opportunities
+    // Get application statistics
     $statsStmt = $conn->query("
         SELECT 
             COUNT(*) as total,
@@ -179,6 +214,35 @@ $currentPage = 'view_applications.php';
             color: var(--text-secondary);
             font-weight: 600;
         }
+
+        .link-section {
+            background: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 0.25rem;
+        }
+
+        .link-section h6 {
+            color: #0d6efd;
+            margin-bottom: 0.75rem;
+        }
+
+        .link-item {
+            margin-bottom: 0.75rem;
+        }
+
+        .link-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-update-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 0.25rem;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body>
@@ -207,7 +271,7 @@ $currentPage = 'view_applications.php';
                 
                 <?php if ($success): ?>
                     <div class="alert alert-success alert-dismissible fade show">
-                        <i class="bi bi-check-circle me-2"></i><?php echo h($success); ?>
+                        <i class="bi bi-check-circle me-2"></i><?php echo $success; ?>
                         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                     </div>
                 <?php endif; ?>
@@ -374,6 +438,7 @@ $currentPage = 'view_applications.php';
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <!-- Basic Information -->
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <strong><i class="bi bi-person me-1"></i>Name:</strong> 
@@ -397,42 +462,62 @@ $currentPage = 'view_applications.php';
                     
                     <hr>
 
+                    <!-- Talent/Modeling Links -->
                     <div id="talent_links" style="display: none;">
-                        <h6 class="mb-3"><i class="bi bi-link-45deg me-2"></i>Talent/Modeling Links:</h6>
-                        <div class="mb-3">
-                            <strong>Set Card Link (Required):</strong><br>
-                            <a href="#" id="detail_setcard" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                                <i class="bi bi-box-arrow-up-right me-1"></i>View Set Card
-                            </a>
-                        </div>
-                        <div class="mb-3">
-                            <strong>VTR/Demo Reel Link (Optional):</strong><br>
-                            <a href="#" id="detail_vtr" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                                <i class="bi bi-box-arrow-up-right me-1"></i>View VTR
-                            </a>
+                        <div class="link-section">
+                            <h6><i class="bi bi-camera me-2"></i>Talent/Modeling Materials</h6>
+                            <div class="link-item">
+                                <strong>Set Card Link:</strong><br>
+                                <a href="#" id="detail_setcard" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+                                    <i class="bi bi-box-arrow-up-right me-1"></i>View Set Card
+                                </a>
+                                <span id="no_setcard" class="text-muted" style="display: none;">Not provided</span>
+                            </div>
+                            <div class="link-item">
+                                <strong>VTR/Demo Reel Link:</strong><br>
+                                <a href="#" id="detail_vtr" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+                                    <i class="bi bi-play-circle me-1"></i>View VTR/Demo Reel
+                                </a>
+                                <span id="no_vtr" class="text-muted" style="display: none;">Not provided</span>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- VA/Other Links -->
                     <div id="va_links" style="display: none;">
-                        <h6 class="mb-3"><i class="bi bi-link-45deg me-2"></i>VA/Other Links:</h6>
-                        <div class="mb-3">
-                            <strong>Resume/CV Link (Required):</strong><br>
-                            <a href="#" id="detail_resume" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                                <i class="bi bi-box-arrow-up-right me-1"></i>View Resume
-                            </a>
-                        </div>
-                        <div class="mb-3">
-                            <strong>Portfolio Link (Optional):</strong><br>
-                            <a href="#" id="detail_portfolio" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
-                                <i class="bi bi-box-arrow-up-right me-1"></i>View Portfolio
-                            </a>
+                        <div class="link-section">
+                            <h6><i class="bi bi-file-earmark-person me-2"></i>Professional Materials</h6>
+                            <div class="link-item">
+                                <strong>Resume/CV Link:</strong><br>
+                                <a href="#" id="detail_resume" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+                                    <i class="bi bi-file-earmark-text me-1"></i>View Resume/CV
+                                </a>
+                                <span id="no_resume" class="text-muted" style="display: none;">Not provided</span>
+                            </div>
+                            <div class="link-item">
+                                <strong>Portfolio Link:</strong><br>
+                                <a href="#" id="detail_portfolio" target="_blank" class="btn btn-sm btn-outline-primary mt-1">
+                                    <i class="bi bi-folder2-open me-1"></i>View Portfolio
+                                </a>
+                                <span id="no_portfolio" class="text-muted" style="display: none;">Not provided</span>
+                            </div>
                         </div>
                     </div>
+
                     <hr>
 
+                    <!-- Cover Letter -->
                     <div class="mb-3">
                         <strong><i class="bi bi-file-text me-1"></i>Cover Letter:</strong>
                         <div id="detail_cover" class="border rounded p-3 bg-light mt-2" style="white-space: pre-wrap;"></div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Status Update Section -->
+                    <div class="status-update-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Note:</strong> Changing the status will automatically send an email notification to the applicant.
                     </div>
 
                     <div class="mb-3">
@@ -471,39 +556,51 @@ $currentPage = 'view_applications.php';
             if (isTalent) {
                 // Set Card Link
                 const setcardLink = document.getElementById('detail_setcard');
-                if (app.setcard_link) {
+                const noSetcard = document.getElementById('no_setcard');
+                if (app.setcard_link && app.setcard_link.trim() !== '') {
                     setcardLink.href = app.setcard_link;
                     setcardLink.style.display = 'inline-block';
+                    noSetcard.style.display = 'none';
                 } else {
                     setcardLink.style.display = 'none';
+                    noSetcard.style.display = 'inline';
                 }
 
                 // VTR Link
                 const vtrLink = document.getElementById('detail_vtr');
-                if (app.vtr_link) {
+                const noVtr = document.getElementById('no_vtr');
+                if (app.vtr_link && app.vtr_link.trim() !== '') {
                     vtrLink.href = app.vtr_link;
                     vtrLink.style.display = 'inline-block';
+                    noVtr.style.display = 'none';
                 } else {
                     vtrLink.style.display = 'none';
+                    noVtr.style.display = 'inline';
                 }
 
             } else {
                 // Resume/CV Link (for VA/Other)
                 const resumeLink = document.getElementById('detail_resume');
-                if (app.resume_cv_link) {
+                const noResume = document.getElementById('no_resume');
+                if (app.resume_cv_link && app.resume_cv_link.trim() !== '') {
                     resumeLink.href = app.resume_cv_link;
                     resumeLink.style.display = 'inline-block';
+                    noResume.style.display = 'none';
                 } else {
                     resumeLink.style.display = 'none';
+                    noResume.style.display = 'inline';
                 }
 
                 // Portfolio Link (for VA/Other)
                 const portfolioLink = document.getElementById('detail_portfolio');
-                if (app.portfolio_link) {
+                const noPortfolio = document.getElementById('no_portfolio');
+                if (app.portfolio_link && app.portfolio_link.trim() !== '') {
                     portfolioLink.href = app.portfolio_link;
                     portfolioLink.style.display = 'inline-block';
+                    noPortfolio.style.display = 'none';
                 } else {
                     portfolioLink.style.display = 'none';
+                    noPortfolio.style.display = 'inline';
                 }
             }
 
@@ -528,6 +625,14 @@ $currentPage = 'view_applications.php';
                 btn.className = 'btn btn-sm btn-' + status.class + (app.status === status.value ? ' active' : '') + ' me-2 mb-2';
                 btn.href = href;
                 btn.innerHTML = '<i class="bi bi-' + status.icon + ' me-1"></i>' + status.label;
+                
+                // Add confirmation for status change
+                if (app.status !== status.value) {
+                    btn.onclick = function(e) {
+                        return confirm('Update status to "' + status.label + '"?\n\nAn email notification will be sent to ' + app.email);
+                    };
+                }
+                
                 statusButtons.appendChild(btn);
             });
             
